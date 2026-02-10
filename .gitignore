@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Development
+*.log
+*.pid
+.env
+.env.local
+.env.*.local
+
+# MacOS
+.DS_Store
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+
+# Tailwind
+.tailwindcss/
+
+# Studio
+studio/__pycache__/
+
+# Database
+*.db
