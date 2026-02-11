@@ -253,7 +253,7 @@ export default function FilesPage() {
     const totalFileSize = files.reduce((sum, f) => sum + f.size, 0)
 
     return (
-      <div className="main">
+      <>
         {/* Back header */}
         <div className="card" style={{ marginBottom: '16px' }}>
           <div className="files-detail-header">
@@ -402,14 +402,14 @@ export default function FilesPage() {
             </div>
           </div>
         )}
-      </div>
+      </>
     )
   }
 
   // ─── Render: Folder List ───
 
   return (
-    <div className="main">
+    <>
       {/* Disk usage */}
       <div className="files-disk-bar">
         <div className="files-disk-label"><strong>{formatBytes(totalSize)}</strong> used</div>
@@ -486,6 +486,6 @@ export default function FilesPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }

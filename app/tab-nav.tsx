@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/transcribe', label: 'Transcribe' },
   { href: '/dump', label: 'Dump' },
+  { href: '/transcribe', label: 'Transcribe' },
 ]
 
 export function TabNav() {

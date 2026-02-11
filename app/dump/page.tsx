@@ -446,7 +446,7 @@ export default function DumpPage() {
   // ─── Render ───
 
   return (
-    <div className="main">
+    <>
       {/* URL Input */}
       <div className="dump-input-section">
         <div className="dump-input-row">
@@ -693,6 +693,6 @@ export default function DumpPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
