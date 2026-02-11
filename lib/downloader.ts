@@ -1,11 +1,12 @@
 import { spawn, ChildProcess } from 'child_process'
 import { updateDownload, getActiveCount, getNextQueued, getDownload } from './db'
 import { cleanSrtFile } from './srt-cleaner'
-import { existsSync, readdirSync, statSync, unlinkSync, renameSync } from 'fs'
+import { existsSync, readdirSync, statSync, unlinkSync, renameSync, writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
 
 const DUMP_DIR = '/Volumes/ME Backup02/_Dump'
 const MAX_CONCURRENT = 2
+const MAX_TITLE_LENGTH = 70
 
 // Track running processes
 const activeProcesses = new Map<string, ChildProcess>()
@@ -15,11 +16,59 @@ const PROGRESS_RE = /\[download\]\s+(\d+\.?\d*)%\s+of\s+\S+\s+at\s+(\S+)\s+ETA\s
 const PROGRESS_RE2 = /\[download\]\s+(\d+\.?\d*)%\s+of\s+\S+\s+in\s+\S+\s+at\s+(\S+)/
 const FRAGMENT_RE = /\[download\]\s+Downloading\s+(?:fragment|video)\s+(\d+)\s+of\s+(\d+)/
 
-function getYtdlpArgs(url: string, mode: string): string[] {
+/**
+ * Sanitize a string for use as a filename/folder name.
+ * Removes filesystem-unsafe characters but keeps spaces, hyphens, etc. readable.
+ */
+function sanitize(str: string): string {
+  return str
+    .replace(/[\/\\:*?"<>|]/g, '')   // remove unsafe chars
+    .replace(/\s+/g, ' ')            // collapse whitespace
+    .trim()
+}
+
+/**
+ * Truncate title at a word boundary, max length chars.
+ */
+function truncateTitle(title: string, max: number = MAX_TITLE_LENGTH): string {
+  const clean = sanitize(title)
+  if (clean.length <= max) return clean
+  const truncated = clean.slice(0, max)
+  const lastSpace = truncated.lastIndexOf(' ')
+  if (lastSpace > max * 0.5) return truncated.slice(0, lastSpace).trim()
+  return truncated.trim()
+}
+
+/**
+ * Build the clean folder name and base filename for a download.
+ * Folder: "Title of Video [videoID]"
+ * Files:  "Title of Video.ext", "Title of Video_proxy.ext"
+ */
+function buildOutputNames(title: string, videoId: string): { folderName: string; baseName: string } {
+  const cleanTitle = truncateTitle(title)
+  return {
+    folderName: `${cleanTitle} [${videoId}]`,
+    baseName: cleanTitle,
+  }
+}
+
+/**
+ * Write an info.json with full metadata into the output folder.
+ */
+function writeInfoJson(outputDir: string, info: Record<string, unknown>): void {
+  try {
+    const infoPath = path.join(outputDir, 'info.json')
+    writeFileSync(infoPath, JSON.stringify(info, null, 2), 'utf-8')
+  } catch {}
+}
+
+function getYtdlpArgs(url: string, mode: string, title: string, videoId: string): string[] {
+  const { folderName, baseName } = buildOutputNames(title, videoId)
+  const folderPath = path.join(DUMP_DIR, folderName)
+
   const base = [
     '--no-colors',
     '--newline',
-    '--restrict-filenames',
   ]
 
   switch (mode) {
@@ -31,8 +80,8 @@ function getYtdlpArgs(url: string, mode: string): string[] {
         '-f', 'bv*+ba/b',
         '--merge-output-format', 'mp4',
         '--write-auto-sub', '--write-sub', '--sub-lang', 'en', '--convert-subs', 'srt',
-        '--embed-thumbnail', '--write-thumbnail', '--add-metadata', '--write-description',
-        '-o', path.join(DUMP_DIR, '%(extractor_key)s_%(upload_date>%m_%d_%y)s_%(channel)s_%(title)s_%(id)s/MASTER_%(extractor_key)s_%(upload_date>%m_%d_%y)s_%(channel)s_%(title)s_%(id)s.%(ext)s'),
+        '--write-thumbnail', '--add-metadata', '--write-description',
+        '-o', path.join(folderPath, `${baseName}.%(ext)s`),
         url,
       ]
 
@@ -41,7 +90,7 @@ function getYtdlpArgs(url: string, mode: string): string[] {
         ...base,
         '--skip-download',
         '--write-auto-sub', '--write-sub', '--sub-lang', 'en', '--convert-subs', 'srt',
-        '-o', path.join(DUMP_DIR, '%(channel)s/%(extractor_key)s_%(upload_date>%m_%d_%y)s_%(channel)s_%(title)s_%(id)s.%(ext)s'),
+        '-o', path.join(folderPath, `${baseName}.%(ext)s`),
         url,
       ]
 
@@ -53,7 +102,7 @@ function getYtdlpArgs(url: string, mode: string): string[] {
         '-f', 'ba/b',
         '-x', '--audio-format', 'wav', '--audio-quality', '0',
         '--write-thumbnail', '--write-description',
-        '-o', path.join(DUMP_DIR, '%(extractor_key)s_%(upload_date>%m_%d_%y)s_%(channel)s_%(title)s_%(id)s/AUDIO_%(extractor_key)s_%(upload_date>%m_%d_%y)s_%(channel)s_%(title)s_%(id)s.%(ext)s'),
+        '-o', path.join(folderPath, `${baseName}.%(ext)s`),
         url,
       ]
 
@@ -118,14 +167,26 @@ async function postProcess(id: string, mode: string, url: string): Promise<void>
     return
   }
 
+  // Write info.json with metadata
+  writeInfoJson(outputDir, {
+    title: row.title,
+    channel: row.channel,
+    url: row.url,
+    duration: row.duration,
+    mode: row.mode,
+    downloaded_at: new Date().toISOString(),
+  })
+
   try {
     if (mode === 'full') {
-      // Create PROXY from MASTER
       const files = readdirSync(outputDir)
-      const master = files.find(f => f.startsWith('MASTER_') && f.endsWith('.mp4'))
+      
+      // Create PROXY from the main mp4
+      const master = files.find(f => f.endsWith('.mp4'))
       if (master) {
         const masterPath = path.join(outputDir, master)
-        const proxyPath = path.join(outputDir, master.replace('MASTER_', 'PROXY_'))
+        const proxyName = master.replace(/\.mp4$/, '_proxy.mp4')
+        const proxyPath = path.join(outputDir, proxyName)
         
         await new Promise<void>((resolve, reject) => {
           const ffmpeg = spawn('ffmpeg', [
@@ -135,7 +196,7 @@ async function postProcess(id: string, mode: string, url: string): Promise<void>
             '-c:a', 'aac', '-b:a', '128k',
             '-movflags', '+faststart',
             proxyPath,
-          ])
+          ], { env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` } })
           ffmpeg.on('close', code => code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}`)))
           ffmpeg.on('error', reject)
         })
@@ -147,24 +208,21 @@ async function postProcess(id: string, mode: string, url: string): Promise<void>
         const srtPath = path.join(outputDir, srt)
         const cleanText = cleanSrtFile(srtPath, url)
         const txtPath = srtPath.replace(/\.srt$/, '.txt')
-        require('fs').writeFileSync(txtPath, cleanText, 'utf-8')
+        writeFileSync(txtPath, cleanText, 'utf-8')
       }
     } else if (mode === 'text') {
-      // Clean all SRT files in the output
-      const parentDir = outputDir
-      const files = readdirSync(parentDir)
+      const files = readdirSync(outputDir)
       for (const f of files) {
         if (f.endsWith('.srt')) {
-          const srtPath = path.join(parentDir, f)
+          const srtPath = path.join(outputDir, f)
           const cleanText = cleanSrtFile(srtPath, url)
           const txtPath = srtPath.replace(/\.srt$/, '.txt')
-          require('fs').writeFileSync(txtPath, cleanText, 'utf-8')
+          writeFileSync(txtPath, cleanText, 'utf-8')
         }
       }
     } else if (mode === 'wav') {
-      // Convert to 48kHz 16-bit PCM
       const files = readdirSync(outputDir)
-      const wav = files.find(f => f.startsWith('AUDIO_') && f.endsWith('.wav'))
+      const wav = files.find(f => f.endsWith('.wav'))
       if (wav) {
         const wavPath = path.join(outputDir, wav)
         const tmpPath = wavPath + '.tmp.wav'
@@ -174,7 +232,7 @@ async function postProcess(id: string, mode: string, url: string): Promise<void>
             '-y', '-i', wavPath,
             '-ar', '48000', '-ac', '2', '-sample_fmt', 's16', '-c:a', 'pcm_s16le',
             tmpPath,
-          ])
+          ], { env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` } })
           ffmpeg.on('close', code => {
             if (code === 0) {
               unlinkSync(wavPath)
@@ -207,19 +265,26 @@ export function startDownload(id: string): void {
   const row = getDownload(id)
   if (!row) return
 
-  const args = getYtdlpArgs(row.url, row.mode)
+  // Extract video ID from URL for folder naming
+  const videoId = extractVideoId(row.url) || id
+  const title = row.title || 'Untitled'
+
+  const args = getYtdlpArgs(row.url, row.mode, title, videoId)
+
+  // Pre-calculate and store the output directory
+  const { folderName } = buildOutputNames(title, videoId)
+  const expectedDir = path.join(DUMP_DIR, folderName)
   
   updateDownload(id, { 
     status: 'downloading', 
     started_at: new Date().toISOString(),
     progress_percent: 0,
+    output_dir: expectedDir,
   })
 
   const proc = spawn('yt-dlp', args, { env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` } })
   activeProcesses.set(id, proc)
   updateDownload(id, { pid: proc.pid || null })
-
-  let lastOutputDir = ''
 
   const handleLine = (line: string) => {
     // Check for cancellation
@@ -232,20 +297,16 @@ export function startDownload(id: string): void {
     // Detect output directory from yt-dlp's destination messages
     const destMatch = line.match(/\[download\] Destination: (.+)/)
     if (destMatch) {
-      const destPath = destMatch[1]
-      const dir = path.dirname(destPath)
+      const dir = path.dirname(destMatch[1])
       if (dir !== DUMP_DIR) {
-        lastOutputDir = dir
         updateDownload(id, { output_dir: dir })
       }
     }
 
-    // Also detect from merger output
     const mergeMatch = line.match(/\[Merger\] Merging formats into "(.+)"/)
     if (mergeMatch) {
       const dir = path.dirname(mergeMatch[1])
       if (dir !== DUMP_DIR) {
-        lastOutputDir = dir
         updateDownload(id, { output_dir: dir })
       }
     }
@@ -274,7 +335,6 @@ export function startDownload(id: string): void {
   let stderr = ''
   proc.stderr?.on('data', (data: Buffer) => {
     stderr += data.toString()
-    // yt-dlp sends some progress to stderr too
     const lines = stderr.split('\n')
     stderr = lines.pop() || ''
     for (const line of lines) handleLine(line)
@@ -287,14 +347,6 @@ export function startDownload(id: string): void {
     if (!current || current.status === 'cancelled') return
 
     if (code === 0) {
-      // Detect output dir if we haven't yet
-      if (!lastOutputDir) {
-        const found = findOutputDir(row.url)
-        if (found) lastOutputDir = found
-      }
-      if (lastOutputDir) {
-        updateDownload(id, { output_dir: lastOutputDir })
-      }
       postProcess(id, row.mode, row.url).then(() => processQueue())
     } else {
       updateDownload(id, { 
@@ -315,6 +367,30 @@ export function startDownload(id: string): void {
     })
     processQueue()
   })
+}
+
+/**
+ * Extract video ID from various URL formats.
+ */
+function extractVideoId(url: string): string | null {
+  // YouTube: various formats
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/)
+  if (ytMatch) return ytMatch[1]
+
+  // Twitter/X: status ID
+  const twMatch = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/)
+  if (twMatch) return twMatch[1]
+
+  // Generic: use last path segment or query param
+  try {
+    const u = new URL(url)
+    const v = u.searchParams.get('v')
+    if (v) return v
+    const segments = u.pathname.split('/').filter(Boolean)
+    if (segments.length > 0) return segments[segments.length - 1].slice(0, 20)
+  } catch {}
+
+  return null
 }
 
 export function cancelDownload(id: string): boolean {

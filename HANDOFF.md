@@ -1,16 +1,17 @@
 # BRYTOOLS HANDOFF
 **Last Updated**: February 10, 2026
-**Status**: Phase 1 + Phase 2 COMPLETE. Both Transcribe and Dump tabs are live.
+**Status**: Phase 1 + Phase 2 + Phase 4 (File Browser) COMPLETE.
 
 ---
 
 ## What Is BryTools
 
-Bryan's unified personal toolbox. A single Next.js app with tab-based navigation hosting multiple tools. Two working tabs: **Transcribe** (audio/video transcription via Whisper AI) and **Dump** (yt-dlp downloads with Full/Text/WAV modes).
+Bryan's unified personal toolbox. A single Next.js app with tab-based navigation hosting multiple tools. Two working tabs: **Transcribe** (audio/video transcription via Whisper AI) and **Dump** (yt-dlp downloads with Full/Text/WAV modes + inline file browser).
 
-Design: dark NLE aesthetic inspired by DaVinci Resolve. Outfit font, warm earth gold accent (#b8977a), no rounded corners, museum-quality minimalism.
+Design: dark NLE aesthetic inspired by DaVinci Resolve. Outfit font, warm earth gold accent (#b8977a), no rounded corners, museum-quality minimalism. No hot colors (reds, bright blues, etc.) in the UI design.
 
 **Live at**: `http://100.80.21.63:3002` (Mac Mini via Tailscale)
+**Repo**: `github.com/rowlandbb/brytools` (private)
 
 ---
 
@@ -78,7 +79,8 @@ brytools/
 │   ├── globals.css                 ← Full design system (all CSS variables + components)
 │   ├── favicon.ico
 │   ├── transcribe/page.tsx         ← Full transcription UI
-│   ├── dump/page.tsx               ← Full download UI (URL input, mode selector, queue, history)
+│   ├── dump/page.tsx               ← Download UI + inline file browser
+│   ├── files/page.tsx              ← Standalone file browser (kept but not in nav)
 │   ├── api/transcribe/
 │   │   ├── files/route.ts          ← Lists ready/processing/completed files
 │   │   ├── upload/route.ts         ← Handles file uploads via FormData
@@ -89,11 +91,15 @@ brytools/
 │   │   ├── download/route.ts       ← Returns transcript as downloadable attachment
 │   │   ├── delete/route.ts         ← Deletes transcript file
 │   │   └── storage/route.ts        ← Lists/deletes source files in Done/ folder
-│   └── api/dump/
-│       ├── submit/route.ts         ← POST: fetch metadata + queue URL for download
-│       ├── queue/route.ts          ← GET: active/queued downloads with progress
-│       ├── history/route.ts        ← GET/DELETE: completed download history
-│       └── cancel/route.ts         ← POST: cancel active or queued download
+│   ├── api/dump/
+│   │   ├── submit/route.ts         ← POST: check URL for playlist + queue download
+│   │   ├── queue/route.ts          ← GET: active/queued downloads with progress
+│   │   ├── history/route.ts        ← GET/DELETE: completed download history
+│   │   └── cancel/route.ts         ← POST: cancel active or queued download
+│   └── api/files/
+│       ├── list/route.ts           ← GET: scan _Dump/ for all folders with metadata
+│       ├── detail/route.ts         ← GET: list files in folder. DELETE: file or folder
+│       └── serve/route.ts          ← GET: serve files (video streaming, images, text)
 ├── lib/
 │   ├── db.ts                       ← SQLite wrapper (better-sqlite3) for download history
 │   ├── downloader.ts               ← yt-dlp process spawner, progress parsing, queue manager
@@ -131,11 +137,13 @@ CLI script: `~/bin/brytools`
 
 ### Dump Tab
 
-- **URL input**: Paste a URL and it auto-submits, or type + Enter / click arrow button
+- **URL input**: Paste URL, hit Enter or click arrow to submit
+- **Playlist detection**: Automatically detects playlists. Shows confirmation dialog with video count, duration preview, and options: "Just this video" or "Download all"
 - **Mode selector**: Three modes via segmented control:
   - **Full**: Video (MASTER mp4) + PROXY (1080p transcode) + Subtitles (SRT + cleaned .txt) + Metadata
   - **Text**: Subtitles only, SRT cleaned to plain text for NotebookLM
   - **WAV**: Audio only, converted to 48kHz 16-bit PCM
+- **Clean file naming**: Folder = "Video Title [videoID]", files = "Video Title.ext" with "_proxy" suffix. Title truncated at 70 chars on word boundary. Platform/date/channel metadata stored in info.json inside folder. Files are immediately identifiable in DaVinci Resolve media pool.
 - **Live queue**: Polls every 2 seconds. Shows progress percent, speed, ETA, channel, mode badge
 - **Post-processing**: Automatic after download completes:
   - Full mode: ffmpeg PROXY transcode + SRT cleaning
@@ -143,8 +151,13 @@ CLI script: `~/bin/brytools`
   - WAV mode: ffmpeg sample rate conversion to 48kHz/16-bit
 - **Concurrent downloads**: Max 2 simultaneous, automatic queue processing
 - **Cancel**: Two-step confirm on active and queued downloads
-- **Completed history**: Shows title, channel, mode badge, file size, relative time. Stored in SQLite.
-- **Delete**: Two-step confirm, removes from history
+- **Completed history with inline file browser**:
+  - Click any completed download to expand and see folder contents
+  - Video preview: plays PROXY by default (falls back to MASTER), with thumbnail poster
+  - Text/SRT preview: click to open in modal with copy-to-clipboard
+  - Per-file delete: remove individual files (e.g. nuke MASTER, keep PROXY) with two-step confirm
+  - Folder delete: remove entire download folder with two-step confirm
+  - Auto-cleanup: if last real file is deleted, folder is removed automatically
 - **Supported platforms**: YouTube, Twitter/X, and most sites yt-dlp supports
 
 ---
@@ -187,19 +200,49 @@ CLI script: `~/bin/brytools`
 ## How Dump Downloads Work
 
 1. User pastes a URL and selects a mode (Full/Text/WAV)
-2. `POST /api/dump/submit` fetches video metadata via `yt-dlp --dump-json`, inserts into SQLite as "queued"
-3. Queue processor checks for available slots (max 2 concurrent), spawns `yt-dlp` as a child process
-4. Progress is parsed from yt-dlp stdout via regex and written to SQLite in real-time
-5. Frontend polls `GET /api/dump/queue` every 2 seconds for live progress
-6. On yt-dlp completion, post-processing runs (PROXY transcode, SRT cleaning, WAV conversion depending on mode)
-7. Final status and file size written to SQLite, job moves to completed history
-8. Output lands in `/Volumes/ME Backup02/_Dump/` organized by folder per video
+2. `POST /api/dump/submit` with `action: 'check'` probes URL via `yt-dlp --dump-json --flat-playlist`
+3. If playlist detected, returns count + preview for user confirmation
+4. On confirm (or single video), `action: 'submit'` inserts into SQLite as "queued"
+5. Queue processor checks for available slots (max 2 concurrent), spawns `yt-dlp` as a child process
+6. Progress is parsed from yt-dlp stdout via regex and written to SQLite in real-time
+7. Frontend polls `GET /api/dump/queue` every 2 seconds for live progress
+8. On yt-dlp completion, post-processing runs (PROXY transcode, SRT cleaning, WAV conversion depending on mode)
+9. info.json written with title, channel, URL, duration, mode, timestamp
+10. Final status and file size written to SQLite, job moves to completed history
+11. Output lands in `/Volumes/ME Backup02/_Dump/Video Title [videoID]/`
+
+### File Naming Convention
+
+```
+_Dump/
+  Video Title [h9385x9HBZc]/
+    Video Title.mp4                    ← MASTER (original quality)
+    Video Title_proxy.mp4              ← PROXY (1080p, fast transcode)
+    Video Title.en.srt                 ← Subtitles
+    Video Title.en.txt                 ← Cleaned transcript
+    Video Title.webp                   ← Thumbnail
+    Video Title.description            ← Video description
+    info.json                          ← Metadata (channel, date, URL, etc.)
+```
+
+Title is first in every filename so it's identifiable in DaVinci Resolve media pool. Video ID in folder brackets keeps things unique. Platform/date/channel live in info.json, not the filename.
 
 ### yt-dlp Dependencies (installed on Mac Mini via Homebrew)
 
 ```bash
 brew install yt-dlp ffmpeg
 ```
+
+---
+
+## File Browser API
+
+The file browser APIs serve the inline file browser in the Dump tab and the standalone /files page.
+
+- `GET /api/files/list` - Scans _Dump/ directory, returns folder metadata (title from info.json or folder name, channel, mode detection, file count, total size, thumbnail). Supports `?q=` search.
+- `GET /api/files/detail?folder=NAME` - Lists files in a specific folder with type classification (video/audio/subtitle/text/image/data), proxy detection, size. Returns recommended preview video (proxy preferred) and thumbnail.
+- `DELETE /api/files/detail` - Body: `{folder, file?}`. Deletes a specific file or entire folder. Auto-removes folder if only info.json remains after file delete.
+- `GET /api/files/serve?folder=NAME&file=NAME` - Serves files with proper MIME types. Supports HTTP Range requests for video streaming. Path traversal protected.
 
 ---
 
@@ -217,17 +260,22 @@ brew install yt-dlp ffmpeg
 --text-dim: #6b6560    --text-muted: #3d3a36
 ```
 
+### UI Direction
+Muted earth tones only. No hot colors (red, bright blue, neon) in the UI design. The only red is for destructive action confirms, kept minimal.
+
 ### Reusable Component Patterns (CSS classes)
 - **Section**: `.section` + `.section-label` + `.section-count`
 - **Card**: `.card` (border container for rows)
 - **Row**: `.row` > `.row-info` (`.row-icon` + `.row-text` > `.row-name` + `.row-detail`) + `.row-actions`
+- **Expandable row**: `.row--clickable` + `.row--expanded` + `.dump-expanded` (inline file browser)
 - **Progress**: `.processing-progress-track` + `.processing-progress-fill`
-- **Badges**: `.row-badge` (uppercase, accent-tinted)
+- **Badges**: `.row-badge` (inline), `.files-badge` (standalone)
 - **Segmented selector**: `.model-options` + `.model-option` + `.model-option--active`
 - **Confirm pattern**: `.confirm-group` > `.btn-confirm-delete` + `.btn-cancel`
 - **Modal**: `.preview-overlay` + `.preview-panel` + `.preview-header` + `.preview-body`
 - **URL input**: `.dump-input-section` + `.dump-url-input` + `.dump-go-btn`
-- **Mode selector**: `.dump-mode-options` (reuses `.model-options` pattern)
+- **File browser**: `.folder-row`, `.file-row`, `.files-video-preview`, `.files-btn-sm`
+- **Playlist dialog**: `.playlist-panel` + `.playlist-actions`
 
 ---
 
