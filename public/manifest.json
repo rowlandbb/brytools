@@ -1,7 +1,7 @@
 {
   "name": "BryTools",
   "short_name": "BryTools",
-  "start_url": "/dump",
+  "start_url": "/services",
   "display": "standalone",
   "background_color": "#090909",
   "theme_color": "#090909",
