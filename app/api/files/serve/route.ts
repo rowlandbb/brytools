@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { existsSync, statSync, readFileSync, createReadStream } from 'fs'
+import { existsSync, statSync, readFileSync } from 'fs'
 import path from 'path'
 
 const DUMP_DIR = '/Volumes/ME Backup02/_Dump'
@@ -22,10 +22,16 @@ const MIME_TYPES: Record<string, string> = {
   '.json': 'application/json',
 }
 
+function dlHeaders(download: boolean, filename: string): Record<string, string> {
+  if (!download) return {}
+  return { 'Content-Disposition': `attachment; filename="${filename}"` }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const folder = req.nextUrl.searchParams.get('folder')
     const file = req.nextUrl.searchParams.get('file')
+    const download = req.nextUrl.searchParams.get('dl') === '1'
 
     if (!folder || !file) {
       return NextResponse.json({ error: 'folder and file params required' }, { status: 400 })
@@ -45,6 +51,18 @@ export async function GET(req: NextRequest) {
     const ext = path.extname(file).toLowerCase()
     const mimeType = MIME_TYPES[ext] || 'application/octet-stream'
 
+    // Download mode: force download for any file type
+    if (download) {
+      const content = readFileSync(filePath)
+      return new NextResponse(content, {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': String(stat.size),
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(file)}"`,
+        },
+      })
+    }
+
     // Handle range requests for video/audio streaming
     const rangeHeader = req.headers.get('range')
 
@@ -54,7 +72,6 @@ export async function GET(req: NextRequest) {
       const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + 5 * 1024 * 1024 - 1, stat.size - 1)
       const chunkSize = end - start + 1
 
-      // Read the chunk
       const buffer = Buffer.alloc(chunkSize)
       const fd = require('fs').openSync(filePath, 'r')
       require('fs').readSync(fd, buffer, 0, chunkSize, start)
@@ -72,7 +89,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // For text files, return the content directly
+    // Text files: return content directly
     if (mimeType.startsWith('text/') || mimeType === 'application/json') {
       const content = readFileSync(filePath, 'utf-8')
       return new NextResponse(content, {
@@ -83,7 +100,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // For images and small files, return the whole thing
+    // Images and other files
     const content = readFileSync(filePath)
     return new NextResponse(content, {
       headers: {

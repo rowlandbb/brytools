@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   ArrowRight, Loader2, Check, X, Trash2, Download,
   Clock, AlertCircle, Film, FileText, AudioLines, List,
-  Image, File, ChevronDown, ChevronRight, Copy,
+  Image, File, ChevronDown, ChevronRight, Copy, ArrowDownToLine, Mic,
 } from 'lucide-react'
 
 // ─── Types ───
@@ -134,6 +134,7 @@ export default function DumpPage() {
   const [confirmFileDelete, setConfirmFileDelete] = useState<{ folder: string; file: string } | null>(null)
   const [confirmFolderDelete, setConfirmFolderDelete] = useState<string | null>(null)
   const [fileDeleting, setFileDeleting] = useState(false)
+  const [sentToScribe, setSentToScribe] = useState<string | null>(null) // filename that was just sent
 
   // ─── Data fetching ───
 
@@ -352,6 +353,21 @@ export default function DumpPage() {
     setFileDeleting(false)
   }
 
+  const handleSendToScribe = async (folder: string, file: string) => {
+    try {
+      const r = await fetch('/api/files/send-to-scribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder, file }),
+      })
+      const d = await r.json()
+      if (r.ok) {
+        setSentToScribe(file)
+        setTimeout(() => setSentToScribe(null), 3000)
+      }
+    } catch {}
+  }
+
   // ─── Render helpers ───
 
   const activeJobs = queue.filter(j => j.status === 'downloading' || j.status === 'processing')
@@ -412,13 +428,39 @@ export default function DumpPage() {
                 onClick={isClickable ? () => openTextPreview(folder, file.name) : undefined}
               >
                 <div className={fileIconClass(file.type)}>{fileIcon(file.type)}</div>
-                <div className="file-info"><span className="file-name">{file.name}</span></div>
+                <div className="file-info">
+                  <span className="file-name">{file.name}</span>
+                  <span className="file-meta-mobile">
+                    {file.isProxy ? 'proxy' : file.type === 'video' ? 'master' : file.ext}
+                    {file.ext && ` · .${file.ext}`}
+                  </span>
+                </div>
                 <span className="file-ext">{file.isProxy ? 'proxy' : file.ext}</span>
                 <span className="file-size">{formatBytes(file.size)}</span>
                 <div className="file-actions">
                   {isClickable && (
                     <button className="files-btn-sm" onClick={e => { e.stopPropagation(); openTextPreview(folder, file.name) }}>View</button>
                   )}
+                  {(file.type === 'video' || file.type === 'audio') && (
+                    sentToScribe === file.name ? (
+                      <span className="files-btn-sm files-btn-scribe-sent"><Check size={11} strokeWidth={1.5} /> Sent</span>
+                    ) : (
+                      <button
+                        className="files-btn-sm files-btn-scribe"
+                        onClick={e => { e.stopPropagation(); handleSendToScribe(folder, file.name) }}
+                      >
+                        <Mic size={11} strokeWidth={1.5} /><span className="scribe-label">Scribe</span>
+                      </button>
+                    )
+                  )}
+                  <a
+                    className="files-btn-sm files-btn-dl"
+                    href={`${serveUrl(folder, file.name)}&dl=1`}
+                    onClick={e => e.stopPropagation()}
+                    download
+                  >
+                    <ArrowDownToLine size={11} strokeWidth={1.5} />
+                  </a>
                   {confirmFileDelete?.folder === folder && confirmFileDelete?.file === file.name ? (
                     <div className="confirm-group" onClick={e => e.stopPropagation()}>
                       <button className="btn-confirm-delete" onClick={() => handleDeleteFile(folder, file.name)} disabled={fileDeleting}>
