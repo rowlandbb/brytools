@@ -81,6 +81,25 @@ Note: Ollama was removed from watchdog monitoring since it runs on Mac Studio an
 
 ---
 
+## Fresh Install (New Mac)
+
+```bash
+git clone git@github.com:rowlandbb/brytools.git ~/Documents/Vibe/brytools
+cd ~/Documents/Vibe/brytools
+./setup.sh
+brytools start
+```
+
+`setup.sh` is idempotent and handles everything: Homebrew, Node.js, yt-dlp, ffmpeg, speedtest-cli, npm install, production build, the `brytools` CLI (with auto-detected Tailscale IP), PATH config, watchdog scaffolding, and launchd plist generation. Safe to re-run anytime (skips what's already installed).
+
+**Manual steps after setup:**
+1. Install and log into [Tailscale](https://tailscale.com/download/mac), then re-run `./setup.sh` to stamp the IP into the CLI
+2. Mount external volumes (`ME Backup02` for transcription and dump storage)
+3. Set watchdog phone number in the Services UI
+4. Set up SSH key for Mac Studio (`ssh-copy-id bryan@100.100.179.121`) if Scribe tab is needed
+
+---
+
 ## CLI Quick Reference
 
 The `brytools` command lives at `~/bin/brytools` and is in PATH.
