@@ -76,7 +76,7 @@ Note: Ollama was removed from watchdog monitoring since it runs on Mac Studio an
 ## Project Location
 
 ```
-/Volumes/RowMedia/CODE/brytools/
+/Users/bryanrowland/Documents/Vibe/brytools/
 ```
 
 ---

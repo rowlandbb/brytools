@@ -15,8 +15,8 @@ const LOG_PATHS: Record<string, { stdout: string; stderr: string }> = {
     stderr: '/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/archive-stderr.log',
   },
   'brytools': {
-    stdout: '/Volumes/RowMedia/CODE/brytools/brytools.log',
-    stderr: '/Volumes/RowMedia/CODE/brytools/brytools.log',
+    stdout: '/Users/bryanrowland/Documents/Vibe/brytools/brytools.log',
+    stderr: '/Users/bryanrowland/Documents/Vibe/brytools/brytools.log',
   },
   'ollama': {
     stdout: '', // Remote: logs fetched via SSH

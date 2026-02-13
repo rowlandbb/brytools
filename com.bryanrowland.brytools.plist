@@ -3,21 +3,23 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.bryanrowland.brytools</string>
+    <string>com.bryan.brytools-app</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Volumes/RowMedia/CODE/brytools/start-server.sh</string>
+        <string>/Users/bryanrowland/Documents/Vibe/brytools/start-server.sh</string>
     </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/bryanrowland/Documents/Vibe/brytools</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Volumes/RowMedia/CODE/brytools/brytools.log</string>
+    <string>/Users/bryanrowland/Documents/Vibe/brytools/brytools.log</string>
     <key>StandardErrorPath</key>
-    <string>/Volumes/RowMedia/CODE/brytools/brytools.log</string>
-    <key>WorkingDirectory</key>
-    <string>/Volumes/RowMedia/CODE/brytools</string>
+    <string>/Users/bryanrowland/Documents/Vibe/brytools/brytools.log</string>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
 </dict>
 </plist>

@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   // Also update the watchdog script's ALERT_TO in both locations
   try {
     const paths = [
-      '/Volumes/RowMedia/CODE/brytools/watchdog.sh',
+      '/Users/bryanrowland/Documents/Vibe/brytools/watchdog.sh',
       '/Users/bryanrowland/.brytools-watchdog/watchdog.sh',
     ]
     for (const scriptPath of paths) {

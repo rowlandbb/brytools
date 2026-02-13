@@ -2,7 +2,7 @@
 # brytools - CLI for BryTools server management
 PLIST="com.bryanrowland.brytools"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST.plist"
-LOG="/Volumes/RowMedia/CODE/brytools/brytools.log"
+LOG="/Users/bryanrowland/Documents/Vibe/brytools/brytools.log"
 PORT=3002
 
 case "$1" in
@@ -49,7 +49,7 @@ case "$1" in
     ;;
   install)
     echo "Installing LaunchAgent..."
-    cp "/Volumes/RowMedia/CODE/brytools/$PLIST.plist" "$PLIST_PATH"
+    cp "/Users/bryanrowland/Documents/Vibe/brytools/$PLIST.plist" "$PLIST_PATH"
     launchctl load "$PLIST_PATH"
     echo "Installed and loaded"
     ;;

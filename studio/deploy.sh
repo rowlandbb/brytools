@@ -2,7 +2,7 @@
 # Deploy batch_transcribe.py to Mac Studio
 STUDIO="bryan@100.100.179.121"
 STUDIO_PATH="/Users/bryan/models/whisper"
-LOCAL_PATH="/Volumes/RowMedia/CODE/brytools/studio/batch_transcribe.py"
+LOCAL_PATH="/Users/bryanrowland/Documents/Vibe/brytools/studio/batch_transcribe.py"
 
 echo "Deploying batch_transcribe.py to Mac Studio..."
 scp "$LOCAL_PATH" "$STUDIO:$STUDIO_PATH/batch_transcribe.py"

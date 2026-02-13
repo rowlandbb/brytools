@@ -7,7 +7,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Volumes/RowMedia/CODE/brytools/watchdog.sh</string>
+        <string>/Users/bryanrowland/Documents/Vibe/brytools/watchdog.sh</string>
     </array>
     <key>StartInterval</key>
     <integer>60</integer>
