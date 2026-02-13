@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 
 const TABS = [
-  { href: '/services', label: 'Services', icon: LayoutDashboard },
+  { href: '/services', label: 'Servers', icon: LayoutDashboard },
   { href: '/dump', label: 'Import', icon: Download },
   { href: '/transcribe', label: 'Scribe', icon: Mic },
 ]
