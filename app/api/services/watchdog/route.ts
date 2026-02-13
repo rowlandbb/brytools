@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { execSync } from 'child_process'
 
 const CONFIG_PATH = '/Users/bryanrowland/.brytools-watchdog/config.json'
 const STATE_DIR = '/Users/bryanrowland/.brytools-watchdog'
+const PLIST = '/Users/bryanrowland/Library/LaunchAgents/com.bryanrowland.brytools-watchdog.plist'
 
 function readConfig(): Record<string, string> {
   try { return JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) }
@@ -14,13 +16,37 @@ function writeConfig(cfg: Record<string, string>) {
   writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2))
 }
 
+function isLoaded(): boolean {
+  try {
+    const out = execSync('launchctl list 2>/dev/null', { encoding: 'utf-8' })
+    return out.includes('com.bryanrowland.brytools-watchdog')
+  } catch { return false }
+}
+
 export async function GET() {
   const cfg = readConfig()
-  return NextResponse.json({ alertTo: cfg.alertTo || '', enabled: !!cfg.alertTo })
+  const loaded = isLoaded()
+  return NextResponse.json({ alertTo: cfg.alertTo || '', enabled: loaded, configured: !!cfg.alertTo })
 }
 
 export async function POST(req: NextRequest) {
-  const { alertTo } = await req.json()
+  const body = await req.json()
+
+  // Toggle enabled/disabled
+  if (body.action === 'toggle') {
+    const loaded = isLoaded()
+    try {
+      if (loaded) {
+        execSync(`launchctl unload ${PLIST} 2>/dev/null`)
+      } else {
+        execSync(`launchctl load ${PLIST} 2>/dev/null`)
+      }
+    } catch { /* ignore */ }
+    return NextResponse.json({ ok: true, enabled: !loaded })
+  }
+
+  // Save phone number
+  const { alertTo } = body
   const cfg = readConfig()
   cfg.alertTo = alertTo || ''
   writeConfig(cfg)

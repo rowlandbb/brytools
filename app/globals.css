@@ -3576,3 +3576,282 @@ body {
     display: none;
   }
 }
+
+
+/* ─── Machine Sub-Tabs ─── */
+
+.machine-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 3px;
+}
+
+.machine-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.02em;
+}
+
+.machine-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.machine-tab--active {
+  color: var(--accent);
+  background: var(--raised);
+  border: 1px solid var(--border-hi);
+}
+
+.machine-tab--studio.machine-tab--active {
+  color: var(--purple);
+}
+
+/* ─── Studio Tab ─── */
+
+.studio-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.studio-tab > .heartbeat {
+  border-color: rgba(167, 139, 250, 0.15);
+  background: rgba(167, 139, 250, 0.02);
+}
+
+.studio-tab > .heartbeat .heartbeat-header {
+  border-bottom-color: rgba(167, 139, 250, 0.1);
+}
+
+/* ─── Mini Tab ─── */
+
+.mini-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mini-tab > .heartbeat {
+  border-color: rgba(196, 160, 105, 0.15);
+  background: rgba(196, 160, 105, 0.02);
+}
+
+.mini-tab > .heartbeat .heartbeat-header {
+  border-bottom-color: rgba(196, 160, 105, 0.1);
+}
+
+.studio-unreachable {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.studio-unreachable-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.studio-unreachable-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.studio-unreachable-sub {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* GPU Activity Graph */
+
+.studio-gpu-graph {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.studio-gpu-graph-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.studio-gpu-graph-value {
+  margin-left: auto;
+  color: var(--purple);
+  font-size: 13px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-gpu-graph-wrap {
+  height: 60px;
+}
+
+/* Studio uptime bar */
+
+.studio-uptime-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.studio-uptime-load {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 4-gauge layout */
+
+.svc-gauges--four {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+
+@media (max-width: 639px) {
+  .svc-gauges--four {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .studio-uptime-bar {
+    padding: 6px 10px;
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+
+  .studio-uptime-load {
+    font-size: 10px;
+  }
+
+  .studio-gpu-graph {
+    padding: 8px 12px;
+  }
+
+  .studio-gpu-graph-header {
+    font-size: 11px;
+  }
+
+  .studio-gpu-graph-value {
+    font-size: 11px;
+  }
+
+  .studio-gpu-graph-wrap {
+    height: 48px;
+  }
+
+  .studio-unreachable {
+    padding: 20px 12px;
+    font-size: 13px;
+  }
+
+  .section-label {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .section-label .svc-btn {
+    font-size: 10px;
+  }
+
+  .mini-tab > .svc-telem-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─── Model Grid (Tiles) ─── */
+
+.studio-model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+@media (max-width: 639px) {
+  .studio-model-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.studio-model-tile {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease;
+}
+
+.studio-model-tile--active {
+  border-color: rgba(167, 139, 250, 0.3);
+  background: rgba(167, 139, 250, 0.03);
+}
+
+.studio-model-tile-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.studio-model-tile-name {
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-model-tile-badge {
+  margin-left: auto;
+  padding: 1px 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--purple);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  background: rgba(167, 139, 250, 0.06);
+}
+
+.studio-model-tile-specs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

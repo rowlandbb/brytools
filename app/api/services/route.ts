@@ -11,6 +11,7 @@ interface ServiceDef {
   type: string
   description: string
   funnelable: boolean
+  remote?: { host: string; sshUser: string } // Remote service on another machine
 }
 
 const SERVICES: ServiceDef[] = [
@@ -37,18 +38,21 @@ const SERVICES: ServiceDef[] = [
     label: 'Ollama',
     plist: 'homebrew.mxcl.ollama',
     port: 11434,
-    type: 'Homebrew',
-    description: 'Local LLM inference',
+    type: 'Mac Studio',
+    description: 'AI inference engine',
     funnelable: false,
+    remote: { host: '100.100.179.121', sshUser: 'bryan' },
   },
 ]
 
 // ─── Helpers ───
 
-function shell(cmd: string): string {
+function shell(cmd: string, timeout = 10000): string {
   try {
-    return execSync(cmd, { timeout: 5000, encoding: 'utf-8' }).trim()
-  } catch {
+    return execSync(cmd, { timeout, encoding: 'utf-8' }).trim()
+  } catch (err: unknown) {
+    const e = err as { stderr?: string; stdout?: string; message?: string }
+    console.error(`[shell] FAILED: ${cmd}\n  stderr: ${e.stderr || ''}\n  stdout: ${e.stdout || ''}\n  msg: ${e.message || ''}`)
     return ''
   }
 }
@@ -91,18 +95,41 @@ function getTailscaleFunnel(): { active: boolean; port: number | null; url: stri
   }
 }
 
+// ─── Remote health check ───
+
+function checkRemoteHealth(host: string, port: number): { status: 'running' | 'stopped' | 'errored'; portOpen: boolean } {
+  // Quick HTTP check via curl with tight timeout
+  const result = shell(`curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 3 http://${host}:${port}/ 2>/dev/null`)
+  if (result === '200') return { status: 'running', portOpen: true }
+  return { status: 'stopped', portOpen: false }
+}
+
 // ─── GET: Service status ───
 
 export async function GET() {
   const funnel = getTailscaleFunnel()
 
   const services = SERVICES.map(svc => {
+    if (svc.remote) {
+      // Remote service: check via HTTP
+      const { status, portOpen } = checkRemoteHealth(svc.remote.host, svc.port!)
+      const isFunneled = funnel.active && funnel.port === svc.port
+      return {
+        ...svc,
+        status,
+        pid: null,
+        exitCode: null,
+        portOpen,
+        uptime: null,
+        isFunneled,
+      }
+    }
+
+    // Local service: check via launchctl
     const { status: launchdStatus, pid, exitCode } = getServiceStatus(svc.plist)
     const portOpen = svc.port ? isPortListening(svc.port) : false
     const uptime = pid ? getProcessUptime(pid) : null
 
-    // Smart status: if port is listening, service is effectively running
-    // even if launchd thinks otherwise (e.g. restarted via CLI)
     let status = launchdStatus
     if (portOpen && status !== 'running') status = 'running'
 
@@ -131,25 +158,46 @@ export async function POST(req: Request) {
   if (!svc) return NextResponse.json({ error: 'Unknown service' }, { status: 404 })
 
   const plistPath = `${process.env.HOME}/Library/LaunchAgents/${svc.plist}.plist`
-  const homebrewPlistPath = `${process.env.HOME}/Library/LaunchAgents/${svc.plist}.plist`
 
   try {
+    if (svc.remote) {
+      // Remote service: use SSH to manage via brew services
+      const ssh = `ssh -o BatchMode=yes -o ConnectTimeout=5 ${svc.remote.sshUser}@${svc.remote.host}`
+      switch (action) {
+        case 'start':
+          shell(`${ssh} "/opt/homebrew/bin/brew services start ollama" 2>&1`, 20000)
+          break
+        case 'stop':
+          shell(`${ssh} "/opt/homebrew/bin/brew services stop ollama" 2>&1`, 20000)
+          break
+        case 'restart':
+          shell(`${ssh} "/opt/homebrew/bin/brew services restart ollama" 2>&1`, 20000)
+          break
+        default:
+          break
+      }
+    } else {
+      // Local launchd-managed service
+      switch (action) {
+        case 'start':
+          shell(`launchctl load "${plistPath}" 2>&1`)
+          shell(`launchctl start "${svc.plist}" 2>&1`)
+          break
+        case 'stop':
+          shell(`launchctl unload "${plistPath}" 2>&1`)
+          break
+        case 'restart':
+          shell(`launchctl unload "${plistPath}" 2>&1`)
+          await new Promise(r => setTimeout(r, 1500))
+          shell(`launchctl load "${plistPath}" 2>&1`)
+          shell(`launchctl start "${svc.plist}" 2>&1`)
+          break
+        default:
+          break
+      }
+    }
+
     switch (action) {
-      case 'start':
-        shell(`launchctl load "${plistPath}" 2>&1`)
-        shell(`launchctl start "${svc.plist}" 2>&1`)
-        break
-
-      case 'stop':
-        shell(`launchctl stop "${svc.plist}" 2>&1`)
-        break
-
-      case 'restart':
-        shell(`launchctl stop "${svc.plist}" 2>&1`)
-        // Brief pause for clean shutdown
-        await new Promise(r => setTimeout(r, 1000))
-        shell(`launchctl start "${svc.plist}" 2>&1`)
-        break
 
       case 'funnel-on':
         if (!svc.port || !svc.funnelable) {
@@ -169,14 +217,24 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     }
 
-    // Brief wait for launchd to settle
-    await new Promise(r => setTimeout(r, 500))
+    // Brief wait for service to settle
+    await new Promise(r => setTimeout(r, svc.remote ? 2000 : 1000))
 
     // Return fresh status
+    const funnel = getTailscaleFunnel()
+
+    if (svc.remote) {
+      const { status, portOpen } = checkRemoteHealth(svc.remote.host, svc.port!)
+      return NextResponse.json({
+        ...svc,
+        status, pid: null, exitCode: null, portOpen, uptime: null,
+        isFunneled: false, funnel,
+      })
+    }
+
     const { status, pid, exitCode } = getServiceStatus(svc.plist)
     const portOpen = svc.port ? isPortListening(svc.port) : false
     const uptime = pid ? getProcessUptime(pid) : null
-    const funnel = getTailscaleFunnel()
     const isFunneled = funnel.active && funnel.port === svc.port
 
     return NextResponse.json({

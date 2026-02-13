@@ -4,7 +4,7 @@ A personal command center for managing media workflows, server infrastructure, a
 
 ## What It Does
 
-**Services** monitors the Mac Mini in real time. CPU, RAM, and storage gauges. A network heartbeat EKG showing live upload/download throughput. Internet speed tests. Service health for BryTools, Skinwalker Archive, and Ollama with start/stop/restart controls, Tailscale Funnel toggling, and log viewers. A watchdog sends iMessage alerts when anything goes down.
+**Services** monitors two machines in real time via sub-tabs for Mac Mini and Mac Studio. Each tab shows a network heartbeat EKG with live throughput and speed tests, CPU/GPU/RAM/Storage gauges, uptime and load averages, and mounted volumes. The Mac Mini tab displays BryTools stats (downloads, transcripts, dump storage) and a collapsible Skinwalker Archive panel with LucidLink status. The Mac Studio tab shows a GPU activity graph and an Ollama inference panel with model tiles and start/stop/restart controls. A watchdog service checks every 60 seconds and sends iMessage alerts when services crash, volumes disconnect, or LucidLink goes offline. The watchdog can be enabled/disabled from the UI.
 
 **Import** downloads video, audio, and subtitles from YouTube and other platforms via yt-dlp. Three modes: Full (master + proxy + subs + metadata), Text (subtitles cleaned to plain text for NotebookLM), and WAV (48kHz 16-bit PCM). Playlist detection, concurrent downloads, post-processing, and an inline file browser with video preview.
 
@@ -12,7 +12,7 @@ A personal command center for managing media workflows, server infrastructure, a
 
 ## Stack
 
-Next.js 16 , React 19, TypeScript, SQLite (better-sqlite3), lucide-react icons. No CSS framework. Hand-written design system with Outfit font, dark NLE aesthetic, and warm earth tones.
+Next.js 16, React 19, TypeScript, SQLite (better-sqlite3), lucide-react icons. No CSS framework. Hand-written design system with Outfit font, dark NLE aesthetic, and warm earth tones. Fully mobile-responsive with iOS-style bottom navigation.
 
 ## Setup
 
@@ -32,10 +32,10 @@ See [HANDOFF.md](HANDOFF.md) for full technical documentation including file str
 
 ## Machines
 
-| Machine | Role |
-|---------|------|
-| Mac Mini M2 Pro 32GB | Always-on server. Runs BryTools, Skinwalker Archive, Ollama, Plex. |
-| Mac Studio M3 Ultra 256GB | Whisper AI transcription via SSH. |
-| MacBook Pro M3 Max 64GB | Development and daily driver. |
+| Machine | Tailscale IP | Role |
+|---------|-------------|------|
+| Mac Mini M2 Pro 32GB | 100.80.21.63 | Always-on server. Runs BryTools, Skinwalker Archive, Plex. |
+| Mac Studio M3 Ultra 256GB | 100.100.179.121 | AI inference (Ollama), Whisper transcription via SSH. |
+| MacBook Pro M3 Max 64GB | 100.71.16.41 | Development and daily driver. |
 
 All connected via Tailscale. Public access available through Tailscale Funnel when enabled.

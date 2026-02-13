@@ -19,8 +19,8 @@ const LOG_PATHS: Record<string, { stdout: string; stderr: string }> = {
     stderr: '/Volumes/RowMedia/CODE/brytools/brytools.log',
   },
   'ollama': {
-    stdout: '/opt/homebrew/var/log/ollama.log',
-    stderr: '/opt/homebrew/var/log/ollama.log',
+    stdout: '', // Remote: logs fetched via SSH
+    stderr: '',
   },
 }
 
@@ -67,10 +67,15 @@ function getSystemStats() {
   const diskLine = shell("df -h /Volumes/RowMedia 2>/dev/null | tail -1")
   const diskMatch = diskLine.match(/\S+\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)%/)
 
+  // GPU stats via ioreg
+  const gpuRaw = shell("ioreg -l 2>/dev/null | grep 'PerformanceStatistics' | head -1")
+  const gpuDevice = parseInt(gpuRaw.match(/"Device Utilization %"=(\d+)/)?.[1] || '0')
+
   return {
     cpu: { user: cpuUser, sys: cpuSys, idle: cpuIdle, total: Math.round(cpuUser + cpuSys) },
     mem: { usedGB: (usedMem / 1073741824).toFixed(1), totalGB: '32', percent: memPercent },
     disk: diskMatch ? { total: diskMatch[1], used: diskMatch[2], avail: diskMatch[3], percent: parseInt(diskMatch[4]) } : null,
+    gpu: { device: gpuDevice },
   }
 }
 
@@ -151,12 +156,15 @@ function getBrytoolsTelemetry() {
   }
 }
 
+const OLLAMA_STUDIO = 'http://100.100.179.121:11434'
+const STUDIO_SSH = 'ssh -o BatchMode=yes -o ConnectTimeout=5 bryan@100.100.179.121'
+
 function getOllamaTelemetry() {
   let models: { name: string; size: string; family: string; params: string; quant: string; modified: string }[] = []
   let runningModels: { name: string; size: string; vramPercent: number }[] = []
 
   try {
-    const tagsRaw = shell("curl -s http://localhost:11434/api/tags 2>/dev/null")
+    const tagsRaw = shell(`curl -s --connect-timeout 3 --max-time 5 ${OLLAMA_STUDIO}/api/tags 2>/dev/null`)
     if (tagsRaw) {
       const tags = JSON.parse(tagsRaw)
       models = (tags.models || []).map((m: Record<string, unknown>) => ({
@@ -171,7 +179,7 @@ function getOllamaTelemetry() {
   } catch { /* ignore */ }
 
   try {
-    const psRaw = shell("curl -s http://localhost:11434/api/ps 2>/dev/null")
+    const psRaw = shell(`curl -s --connect-timeout 3 --max-time 5 ${OLLAMA_STUDIO}/api/ps 2>/dev/null`)
     if (psRaw) {
       const ps = JSON.parse(psRaw)
       runningModels = (ps.models || []).map((m: Record<string, unknown>) => ({
@@ -182,10 +190,19 @@ function getOllamaTelemetry() {
     }
   } catch { /* ignore */ }
 
-  const pid = shell("lsof -iTCP:11434 -sTCP:LISTEN -P -n 2>/dev/null | grep ollama | awk '{print $2}' | head -1")
-  const mem = pid ? getProcessMem(parseInt(pid)) : null
+  // Get process memory from remote machine via SSH
+  const memRaw = shell(`${STUDIO_SSH} 'ps -eo rss,comm | grep ollama | grep -v grep' 2>/dev/null`)
+  let memKB = 0
+  if (memRaw) {
+    for (const line of memRaw.split('\n')) {
+      const num = parseInt(line.trim())
+      if (num > 0) memKB += num
+    }
+  }
+  const memMB = memKB ? Math.round(memKB / 1024) : null
+  const memStr = memMB ? (memMB > 1024 ? `${(memMB / 1024).toFixed(1)} GB` : `${memMB} MB`) : null
 
-  return { models, runningModels, memory: mem }
+  return { models, runningModels, memory: memStr }
 }
 
 // ─── GET endpoint ───
@@ -198,7 +215,11 @@ export async function GET(req: NextRequest) {
 
   // Get log lines
   let logLines: string[] = ['No log output found.']
-  if (paths) {
+  if (id === 'ollama') {
+    // Remote: fetch logs via SSH
+    const raw = shell(`${STUDIO_SSH} "tail -20 /opt/homebrew/var/log/ollama.log" 2>/dev/null`)
+    if (raw) logLines = raw.split('\n')
+  } else if (paths && paths.stdout) {
     let raw = shell(`tail -20 "${paths.stdout}" 2>/dev/null`)
     if (!raw) raw = shell(`tail -20 "${paths.stderr}" 2>/dev/null`)
     if (raw) logLines = raw.split('\n')

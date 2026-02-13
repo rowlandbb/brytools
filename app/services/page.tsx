@@ -5,9 +5,10 @@ import {
   Play, Square, RotateCw, ChevronDown, ChevronRight,
   Globe, Lock, RefreshCw, Database, FileText, Cpu,
   HardDrive, Activity, Zap, Brain, Server, Terminal,
-  ArrowDown, ArrowUp, Wrench, Archive, Sparkles, Eye,
-  Shield, BookOpen, Copy, Check,
+  Wrench, Eye, Copy, Check, Monitor,
 } from 'lucide-react'
+import MacStudioTab from './mac-studio-tab'
+import Heartbeat from './heartbeat'
 
 // ─── Types ───
 interface Service {
@@ -49,219 +50,14 @@ const SERVICE_BRAND: Record<string, {
   ollama: {
     icon: <Brain size={18} />,
     wordmark: 'OLLAMA',
-    subtitle: 'Neural Engine',
+    subtitle: 'Mac Studio',
     accent: 'var(--purple, #a78bfa)',
     accentDim: 'rgba(167, 139, 250, 0.4)',
     className: 'svc-brand--ollama',
   },
 }
 
-interface HeartbeatSample { ts: number; down: number; up: number }
-interface HeartbeatData {
-  samples: HeartbeatSample[]
-  current: { down: number; up: number; downFmt: string; upFmt: string } | null
-}
-
-// ─── Heartbeat EKG ───
-
-function Heartbeat() {
-  const [data, setData] = useState<HeartbeatData>({ samples: [], current: null })
-  const [speedTest, setSpeedTest] = useState<{
-    running: boolean
-    phase: string
-    result: { download: { fmt: string; mbps: number }; upload: { fmt: string; mbps: number }; ping: number; server?: string; isp?: string } | null
-  }>({ running: false, phase: '', result: null })
-  const [pollRate, setPollRate] = useState(2000)
-
-  useEffect(() => {
-    const fetchBeat = async () => {
-      try {
-        const fast = pollRate < 2000 ? '?fast=1' : ''
-        const res = await fetch(`/api/services/heartbeat${fast}`)
-        const d = await res.json()
-        setData(d)
-      } catch { /* ignore */ }
-    }
-    fetchBeat()
-    const iv = setInterval(fetchBeat, pollRate)
-    return () => clearInterval(iv)
-  }, [pollRate])
-
-  const runSpeedTest = async () => {
-    setSpeedTest({ running: true, phase: 'Finding server...', result: null })
-    setPollRate(500)
-    try {
-      fetch('/api/services/heartbeat?fast=1')
-      const phaseTimer = setTimeout(() => setSpeedTest(p => ({ ...p, phase: 'Testing download...' })), 3000)
-      const phaseTimer2 = setTimeout(() => setSpeedTest(p => ({ ...p, phase: 'Testing upload...' })), 15000)
-      const phaseTimer3 = setTimeout(() => setSpeedTest(p => ({ ...p, phase: 'Finishing up...' })), 28000)
-      const res = await fetch('/api/services/speedtest', { method: 'POST' })
-      clearTimeout(phaseTimer)
-      clearTimeout(phaseTimer2)
-      clearTimeout(phaseTimer3)
-      const d = await res.json()
-      if (d.error) {
-        setSpeedTest({ running: false, phase: '', result: null })
-      } else {
-        setSpeedTest({ running: false, phase: '', result: d })
-      }
-      setTimeout(() => setPollRate(2000), 3000)
-    } catch {
-      setSpeedTest({ running: false, phase: '', result: null })
-      setPollRate(2000)
-    }
-  }
-
-  const { samples, current } = data
-  const W = 800; const H = 80
-  const padL = 0; const padR = 0
-
-  // Auto-scale: find max rate across both directions
-  const allRates = samples.flatMap(s => [s.down, s.up])
-  const maxRate = Math.max(1024, ...allRates) * 1.2 // at least 1KB/s scale, 20% headroom
-
-  // Build SVG paths
-  const buildPath = (getValue: (s: HeartbeatSample) => number): string => {
-    if (samples.length < 2) return ''
-    const points = samples.map((s, i) => {
-      const x = padL + (i / (60 - 1)) * (W - padL - padR)
-      const val = getValue(s)
-      const y = H / 2 - (val / maxRate) * (H / 2 - 4)
-      return `${x},${Math.max(4, Math.min(H - 4, y))}`
-    })
-    return `M ${points.join(' L ')}`
-  }
-
-  const buildArea = (getValue: (s: HeartbeatSample) => number, flip: boolean): string => {
-    if (samples.length < 2) return ''
-    const baseline = H / 2
-    const points = samples.map((s, i) => {
-      const x = padL + (i / (60 - 1)) * (W - padL - padR)
-      const val = getValue(s)
-      const offset = (val / maxRate) * (H / 2 - 4)
-      const y = flip ? baseline + offset : baseline - offset
-      return { x, y: Math.max(4, Math.min(H - 4, y)) }
-    })
-    const forward = points.map(p => `${p.x},${p.y}`).join(' L ')
-    const backX0 = points[0].x
-    const backX1 = points[points.length - 1].x
-    return `M ${backX0},${baseline} L ${forward} L ${backX1},${baseline} Z`
-  }
-
-  const downPath = buildPath(s => s.down)
-  const upPath = buildPath(s => s.up)
-  const downArea = buildArea(s => s.down, false)
-  const upArea = buildArea(s => s.up, true)
-
-  const isAlive = samples.length >= 2
-
-  return (
-    <div className="heartbeat">
-      <div className="heartbeat-header">
-        <div className="heartbeat-title">
-          <Activity size={14} />
-          <span>Network</span>
-        </div>
-        <div className="heartbeat-actions">
-          <div className="heartbeat-rates">
-            <div className="heartbeat-rate heartbeat-rate--down">
-              <ArrowDown size={12} />
-              <span>{current?.downFmt || '0 B/s'}</span>
-            </div>
-            <div className="heartbeat-rate heartbeat-rate--up">
-              <ArrowUp size={12} />
-              <span>{current?.upFmt || '0 B/s'}</span>
-            </div>
-          </div>
-          <button
-            className={`svc-btn heartbeat-speedtest-btn ${speedTest.running ? 'heartbeat-speedtest-btn--running' : ''}`}
-            onClick={runSpeedTest}
-            disabled={speedTest.running}
-          >
-            <Zap size={12} />
-            <span>{speedTest.running ? speedTest.phase : 'Speed Test'}</span>
-          </button>
-        </div>
-      </div>
-      <div className="heartbeat-graph">
-        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-          {/* Center baseline */}
-          <line x1={0} y1={H/2} x2={W} y2={H/2} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="4 4" />
-          {isAlive && (
-            <>
-              {/* Download (above center) */}
-              <path d={downArea} fill="var(--accent)" opacity="0.08" />
-              <path d={downPath} fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.7" />
-              {/* Upload (below center) */}
-              <path d={upArea} fill="var(--green)" opacity="0.06" />
-              <path d={upPath} fill="none" stroke="var(--green)" strokeWidth="1.5" opacity="0.6" />
-              {/* Glow dot at latest point */}
-              {samples.length > 0 && (() => {
-                const last = samples[samples.length - 1]
-                const x = W - padR
-                const yDown = H/2 - (last.down / maxRate) * (H/2 - 4)
-                const yUp = H/2 + (last.up / maxRate) * (H/2 - 4)
-                return (
-                  <>
-                    <circle cx={x} cy={Math.max(4, Math.min(H-4, yDown))} r="3" fill="var(--accent)" opacity="0.9">
-                      <animate attributeName="r" values="2;4;2" dur="2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite" />
-                    </circle>
-                    <circle cx={x} cy={Math.max(4, Math.min(H-4, yUp))} r="3" fill="var(--green)" opacity="0.9">
-                      <animate attributeName="r" values="2;4;2" dur="2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite" />
-                    </circle>
-                  </>
-                )
-              })()}
-            </>
-          )}
-          {!isAlive && (
-            <text x={W/2} y={H/2 + 4} textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontFamily="Outfit">
-              Sampling...
-            </text>
-          )}
-        </svg>
-      </div>
-      {(speedTest.running || speedTest.result) && (
-        <div className="speedtest-results">
-          <div className="speedtest-stats-row">
-            <div className="speedtest-stat">
-              <ArrowDown size={13} />
-              <span className="speedtest-value">
-                {speedTest.result ? speedTest.result.download.fmt : '...'}
-              </span>
-              <span className="speedtest-label">Down</span>
-            </div>
-            <div className="speedtest-divider" />
-            <div className="speedtest-stat">
-              <ArrowUp size={13} />
-              <span className="speedtest-value">
-                {speedTest.result ? speedTest.result.upload.fmt : '...'}
-              </span>
-              <span className="speedtest-label">Up</span>
-            </div>
-            <div className="speedtest-divider" />
-            <div className="speedtest-stat">
-              <Activity size={13} />
-              <span className="speedtest-value">
-                {speedTest.result ? `${speedTest.result.ping} ms` : '...'}
-              </span>
-              <span className="speedtest-label">Ping</span>
-            </div>
-          </div>
-          {speedTest.result?.server && (
-            <div className="speedtest-server">
-              <Globe size={11} />
-              <span>{speedTest.result.server}</span>
-              {speedTest.result.isp && <span className="speedtest-isp">via {speedTest.result.isp}</span>}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+// Heartbeat imported from ./heartbeat.tsx
 
 // ─── Gauge Component ───
 function Gauge({ value, max, label, unit, color }: { value: number; max: number; label: string; unit: string; color: string }) {
@@ -343,6 +139,9 @@ function statusLabel(s: Service): string {
   if (s.status === 'errored') return `Errored (exit ${s.exitCode})`
   return 'Stopped'
 }
+function isRemote(s: Service): boolean {
+  return s.type === 'Mac Studio'
+}
 function statusColor(s: Service): string {
   if (s.status === 'running' && (!s.port || s.portOpen)) return 'var(--green)'
   if (s.status === 'errored') return 'var(--red)'
@@ -391,8 +190,9 @@ function BrytoolsPanel({ telemetry: t, logs, plist }: { telemetry: Telemetry; lo
   return (
     <div className="svc-telem">
       <Heartbeat />
-      <div className="svc-gauges">
+      <div className="svc-gauges svc-gauges--four">
         <Gauge value={sys.cpu.total} max={100} label="CPU" unit="%" color="var(--accent)" />
+        <Gauge value={sys.gpu?.device || 0} max={100} label="GPU" unit="%" color="var(--purple, #a78bfa)" />
         <Gauge value={sys.mem.percent} max={100} label="RAM" unit={`${sys.mem.usedGB}/${sys.mem.totalGB} GB`} color="var(--green)" />
         {sys.disk && <Gauge value={sys.disk.percent} max={100} label="Storage" unit={`${sys.disk.avail} free`} color={sys.disk.percent > 85 ? 'var(--red)' : 'var(--accent-dim)'} />}
       </div>
@@ -484,6 +284,7 @@ function WatchdogPanel() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [saving, setSaving] = useState(false)
   const [testSent, setTestSent] = useState(false)
+  const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
     fetch('/api/services/watchdog').then(r => r.json()).then(d => {
@@ -518,6 +319,19 @@ function WatchdogPanel() {
     } catch { /* ignore */ }
   }
 
+  const toggleWatchdog = async () => {
+    setToggling(true)
+    try {
+      const res = await fetch('/api/services/watchdog', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle' })
+      })
+      const d = await res.json()
+      if (d.ok) setEnabled(d.enabled)
+    } catch { /* ignore */ }
+    finally { setToggling(false) }
+  }
+
   const formatTs = (ts: string) => {
     try {
       const d = new Date(ts)
@@ -537,16 +351,26 @@ function WatchdogPanel() {
 
   return (
     <div className="section" style={{ marginTop: 16 }}>
-      <div className="section-label"><span>Watchdog</span></div>
+      <div className="section-label">
+        <span>Watchdog</span>
+        <span className={`svc-watchdog-status ${enabled ? 'svc-watchdog-status--on' : ''}`}>
+          {enabled ? 'Running' : 'Disabled'}
+        </span>
+        <button
+          className={`svc-btn ${enabled ? 'svc-btn--stop' : ''}`}
+          onClick={toggleWatchdog}
+          disabled={toggling}
+          style={{ marginLeft: 'auto' }}
+        >
+          <span>{toggling ? '...' : enabled ? 'Disable' : 'Enable'}</span>
+        </button>
+      </div>
       <div className="svc-service-block">
         <div className="svc-watchdog-config">
           <div className="svc-watchdog-row">
             <div className="svc-watchdog-label">
               <Activity size={14} />
               <span>iMessage Alerts</span>
-              <span className={`svc-watchdog-status ${enabled ? 'svc-watchdog-status--on' : ''}`}>
-                {enabled ? 'Active' : 'Not configured'}
-              </span>
             </div>
           </div>
           <div className="svc-watchdog-row">
@@ -574,7 +398,7 @@ function WatchdogPanel() {
         {incidents.length > 0 && (
           <div className="svc-incidents">
             <div className="svc-activity-label">Incident History</div>
-            {incidents.map((inc, i) => (
+            {incidents.slice(-5).map((inc, i) => (
               <div key={i} className="svc-incident-row">
                 <span className="svc-incident-icon">{eventIcon(inc.event)}</span>
                 <span className="svc-incident-text">{eventLabel(inc.event, inc.service)}</span>
@@ -591,6 +415,7 @@ function WatchdogPanel() {
 // ─── Main Component ───
 
 export default function ServicesPage() {
+  const [machineTab, setMachineTab] = useState<'mini' | 'studio'>('mini')
   const [services, setServices] = useState<Service[]>([])
   const [funnel, setFunnel] = useState<FunnelInfo>({ active: false, port: null, url: null })
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()) // track collapsed (all open by default)
@@ -665,139 +490,233 @@ export default function ServicesPage() {
     }
   }
 
+  // Services for collapsible panels (Skinwalker only on Mini)
+  const miniPanelServices = services.filter(s => s.id === 'skinwalker-archive')
+  // BryTools telemetry for top-level system display
+  const brytoolsTelem = telemetry['brytools'] || {}
+  const brytoolsSys = brytoolsTelem?.system
+
   return (
     <div className="services-page">
-      <div className="section">
-        <div className="section-label">
-          <span>Services</span>
-          <span className="section-count">{services.filter(s => s.status === 'running' && (!s.port || s.portOpen)).length} of {services.length} active</span>
-          <button className="svc-refresh-btn" onClick={() => fetchStatus()} title="Refresh now"><RefreshCw size={13} /></button>
-        </div>
+      {/* Machine Sub-Tabs */}
+      <div className="machine-tabs">
+        <button
+          className={`machine-tab ${machineTab === 'mini' ? 'machine-tab--active' : ''}`}
+          onClick={() => setMachineTab('mini')}
+        >
+          <Server size={14} />
+          <span>Mac Mini</span>
+        </button>
+        <button
+          className={`machine-tab machine-tab--studio ${machineTab === 'studio' ? 'machine-tab--active' : ''}`}
+          onClick={() => setMachineTab('studio')}
+        >
+          <Monitor size={14} />
+          <span>Mac Studio</span>
+        </button>
+      </div>
 
-        {loading ? (
-          <div className="svc-loading">Loading services...</div>
+      {machineTab === 'studio' ? (
+        <MacStudioTab />
+      ) : (
+      <div className="mini-tab">
+        {/* Network Heartbeat */}
+        <Heartbeat />
+
+        {/* Gauges: CPU, GPU, RAM, Storage */}
+        {brytoolsSys ? (
+          <div className="svc-gauges svc-gauges--four">
+            <Gauge value={brytoolsSys.cpu.total} max={100} label="CPU" unit="%" color="var(--accent)" />
+            <Gauge value={brytoolsSys.gpu?.device || 0} max={100} label="GPU" unit="%" color="var(--purple, #a78bfa)" />
+            <Gauge value={brytoolsSys.mem.percent} max={100} label="RAM" unit={`${brytoolsSys.mem.usedGB}/${brytoolsSys.mem.totalGB} GB`} color="var(--green)" />
+            {brytoolsSys.disk && <Gauge value={brytoolsSys.disk.percent} max={100} label="Storage" unit={`${brytoolsSys.disk.avail} free`} color={brytoolsSys.disk.percent > 85 ? 'var(--red)' : 'var(--accent-dim)'} />}
+          </div>
         ) : (
-          <>
-          <div className="svc-service-list">
-            {services.map(svc => {
-              const isOpen = !collapsed.has(svc.id)
-              const isPending = actionPending?.startsWith(svc.id)
-              const isConfirming = confirmAction?.id === svc.id
-              const isRunning = svc.status === 'running'
+          <div className="svc-gauges svc-gauges--four">
+            <Gauge value={0} max={100} label="CPU" unit="%" color="var(--accent)" />
+            <Gauge value={0} max={100} label="GPU" unit="%" color="var(--purple, #a78bfa)" />
+            <Gauge value={0} max={100} label="RAM" unit="..." color="var(--green)" />
+            <Gauge value={0} max={100} label="Storage" unit="..." color="var(--accent-dim)" />
+          </div>
+        )}
 
-              return (
-                <div key={svc.id} className={`svc-service-block ${(SERVICE_BRAND[svc.id] || {}).className || ''}`}>
-                  {/* Branded Header */}
-                  <div className={`svc-header ${isOpen ? 'svc-header--open' : ''}`}>
-                    <div className="svc-header-left" onClick={() => toggleCollapse(svc.id)} style={{ cursor: 'pointer' }}>
-                      <div className={`svc-dot ${svc.status === 'running' && (!svc.port || svc.portOpen) ? 'svc-dot--alive' : ''}`} style={{ background: statusColor(svc) }} />
-                      {SERVICE_BRAND[svc.id] ? (
-                        <div className="svc-header-info">
-                          <div className="svc-brand-wordmark">
-                            <span className="svc-brand-icon">{SERVICE_BRAND[svc.id].icon}</span>
-                            <span className="svc-brand-name">{SERVICE_BRAND[svc.id].wordmark}</span>
-                            <span className="svc-brand-sub">{SERVICE_BRAND[svc.id].subtitle}</span>
-                          </div>
-                          <span className="svc-header-detail">
-                            {statusLabel(svc)}
-                            {svc.uptime && svc.status === 'running' ? ` · ${formatUptime(svc.uptime)}` : ''}
-                            {svc.port ? ` · :${svc.port}` : ''}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="svc-header-info">
-                          <span className="svc-header-name">{svc.label}</span>
-                          <span className="svc-header-detail">
-                            {statusLabel(svc)}
-                            {svc.uptime && svc.status === 'running' ? ` · ${formatUptime(svc.uptime)}` : ''}
-                            {svc.port ? ` · :${svc.port}` : ''}
-                          </span>
-                        </div>
-                      )}
+        {/* Machine info + uptime */}
+        <div className="svc-machine-bar"><Cpu size={13} /><span>Mac Mini M2 Pro &middot; 12 cores &middot; 32 GB RAM</span></div>
+        {brytoolsTelem?.uptime && (
+          <div className="studio-uptime-bar">
+            <Server size={13} />
+            <span>Up {brytoolsTelem.uptime}</span>
+            <span className="studio-uptime-load">Load: {brytoolsTelem.loadAvg?.map((l: number) => l.toFixed(2)).join(' \u00b7 ')}</span>
+          </div>
+        )}
+
+        {/* Stats grid */}
+        {brytoolsTelem?.downloads && (
+          <div className="svc-telem-grid" style={{ border: '1px solid var(--border)', borderTop: 'none', background: 'var(--surface)' }}>
+            <Stat icon={<HardDrive size={16} />} label="Downloads" value={brytoolsTelem.downloads.count} sub={brytoolsTelem.downloads.totalBytes > 0 ? formatBytes(brytoolsTelem.downloads.totalBytes) + ' total' : 'No downloads yet'} />
+            <Stat icon={<FileText size={16} />} label="Transcripts" value={brytoolsTelem.transcripts.completed} sub={`${brytoolsTelem.transcripts.sources} source files`} />
+            <Stat icon={<Database size={16} />} label="Dump Folder" value={brytoolsTelem.dumpSize} sub="Total download storage" />
+          </div>
+        )}
+
+        {/* Volumes */}
+        {brytoolsTelem?.volumes && brytoolsTelem.volumes.length > 0 && (
+          <div className="svc-volumes" style={{ border: '1px solid var(--border)', borderTop: 'none', background: 'var(--surface)' }}>
+            <div className="svc-activity-label">Mounted Volumes</div>
+            {brytoolsTelem.volumes.map((v: any, i: number) => (
+              <div key={i} className={`svc-volume-row ${!v.mounted ? 'svc-volume-row--unmounted' : ''}`}>
+                <div className="svc-volume-left">
+                  <HardDrive size={13} />
+                  <span className="svc-volume-name">{v.label}</span>
+                  {v.mounted
+                    ? <span className="svc-volume-mounted">Mounted</span>
+                    : <span className="svc-volume-unmounted">OFFLINE</span>
+                  }
+                </div>
+                {v.mounted && v.percent != null && (
+                  <div className="svc-volume-right">
+                    <span className="svc-volume-detail">{v.avail} free of {v.total}</span>
+                    <div className="svc-volume-bar">
+                      <div className="svc-volume-bar-fill" style={{ width: `${v.percent}%`, background: v.percent > 85 ? 'var(--red)' : 'var(--accent-dim)' }} />
                     </div>
-                    <div className="svc-header-right">
-                      {svc.funnelable && isRunning && (
-                        <button
-                          className={`svc-access-toggle ${svc.isFunneled ? 'svc-access-toggle--public' : ''}`}
-                          onClick={() => doAction(svc.id, svc.isFunneled ? 'funnel-off' : 'funnel-on')}
-                          disabled={isPending || false}
-                        >
-                          {svc.isFunneled ? <Globe size={12} /> : <Lock size={12} />}
-                          <span>{svc.isFunneled ? 'Public' : 'Private'}</span>
-                        </button>
-                      )}
-                      <div className="row-badge">{svc.type}</div>
-                      {isPending ? (
-                        <div className="svc-spinner"><RotateCw size={14} /></div>
-                      ) : isConfirming ? (
-                        <div className="confirm-group">
-                          <button className="btn-confirm-delete" onClick={() => doAction(confirmAction.id, confirmAction.action)}>
-                            {confirmAction.action === 'stop' ? 'Stop' : 'Restart'}
+                    <span className="svc-volume-pct">{v.percent}%</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Services — collapsible panels */}
+        <div className="section" style={{ marginTop: 16 }}>
+          <div className="section-label">
+            <span>Services</span>
+            <span className="section-count">{miniPanelServices.filter(s => s.status === 'running' && (!s.port || s.portOpen)).length} of {miniPanelServices.length} active</span>
+            <button className="svc-refresh-btn" onClick={() => fetchStatus()} title="Refresh now"><RefreshCw size={13} /></button>
+          </div>
+
+          {loading ? (
+            <div className="svc-loading">Loading services...</div>
+          ) : (
+            <div className="svc-service-list">
+              {miniPanelServices.map(svc => {
+                const isOpen = !collapsed.has(svc.id)
+                const isPending = actionPending?.startsWith(svc.id)
+                const isConfirming = confirmAction?.id === svc.id
+                const isRunning = svc.status === 'running'
+
+                return (
+                  <div key={svc.id} className={`svc-service-block ${(SERVICE_BRAND[svc.id] || {}).className || ''}`}>
+                    <div className={`svc-header ${isOpen ? 'svc-header--open' : ''}`}>
+                      <div className="svc-header-left" onClick={() => toggleCollapse(svc.id)} style={{ cursor: 'pointer' }}>
+                        <div className={`svc-dot ${svc.status === 'running' && (!svc.port || svc.portOpen) ? 'svc-dot--alive' : ''}`} style={{ background: statusColor(svc) }} />
+                        {SERVICE_BRAND[svc.id] ? (
+                          <div className="svc-header-info">
+                            <div className="svc-brand-wordmark">
+                              <span className="svc-brand-icon">{SERVICE_BRAND[svc.id].icon}</span>
+                              <span className="svc-brand-name">{SERVICE_BRAND[svc.id].wordmark}</span>
+                              <span className="svc-brand-sub">{SERVICE_BRAND[svc.id].subtitle}</span>
+                            </div>
+                            <span className="svc-header-detail">
+                              {statusLabel(svc)}
+                              {svc.uptime && svc.status === 'running' ? ` \u00b7 ${formatUptime(svc.uptime)}` : ''}
+                              {svc.port ? ` \u00b7 :${svc.port}` : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="svc-header-info">
+                            <span className="svc-header-name">{svc.label}</span>
+                            <span className="svc-header-detail">
+                              {statusLabel(svc)}
+                              {svc.uptime && svc.status === 'running' ? ` \u00b7 ${formatUptime(svc.uptime)}` : ''}
+                              {svc.port ? ` \u00b7 :${svc.port}` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="svc-header-right">
+                        {svc.funnelable && isRunning && (
+                          <button
+                            className={`svc-access-toggle ${svc.isFunneled ? 'svc-access-toggle--public' : ''}`}
+                            onClick={() => doAction(svc.id, svc.isFunneled ? 'funnel-off' : 'funnel-on')}
+                            disabled={isPending || false}
+                          >
+                            {svc.isFunneled ? <Globe size={12} /> : <Lock size={12} />}
+                            <span>{svc.isFunneled ? 'Public' : 'Private'}</span>
                           </button>
-                          <button className="btn-cancel" onClick={() => setConfirmAction(null)}>Cancel</button>
+                        )}
+                        <div className="row-badge">{svc.type}</div>
+                        {isPending ? (
+                          <div className="svc-spinner"><RotateCw size={14} /></div>
+                        ) : isConfirming ? (
+                          <div className="confirm-group">
+                            <button className="btn-confirm-delete" onClick={() => doAction(confirmAction.id, confirmAction.action)}>
+                              {confirmAction.action === 'stop' ? 'Stop' : 'Restart'}
+                            </button>
+                            <button className="btn-cancel" onClick={() => setConfirmAction(null)}>Cancel</button>
+                          </div>
+                        ) : (
+                          <div className="svc-btns">
+                            {!isRunning && <button className="svc-btn" onClick={() => doAction(svc.id, 'start')}><Play size={13} /><span>Start</span></button>}
+                            {isRunning && (
+                              <>
+                                <button className="svc-btn" onClick={() => setConfirmAction({ id: svc.id, action: 'restart' })} title="Restart"><RotateCw size={13} /></button>
+                                <button className="svc-btn svc-btn--stop" onClick={() => setConfirmAction({ id: svc.id, action: 'stop' })} title="Stop"><Square size={13} /></button>
+                              </>
+                            )}
+                            {!isRunning && svc.status === 'errored' && <button className="svc-btn" onClick={() => doAction(svc.id, 'restart')}><RotateCw size={13} /><span>Restart</span></button>}
+                          </div>
+                        )}
+                        <div className="svc-expand-toggle" onClick={() => toggleCollapse(svc.id)} style={{ cursor: 'pointer' }}>
+                          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </div>
-                      ) : (
-                        <div className="svc-btns">
-                          {!isRunning && <button className="svc-btn" onClick={() => doAction(svc.id, 'start')}><Play size={13} /><span>Start</span></button>}
-                          {isRunning && (
-                            <>
-                              <button className="svc-btn" onClick={() => setConfirmAction({ id: svc.id, action: 'restart' })} title="Restart"><RotateCw size={13} /></button>
-                              <button className="svc-btn svc-btn--stop" onClick={() => setConfirmAction({ id: svc.id, action: 'stop' })} title="Stop"><Square size={13} /></button>
-                            </>
-                          )}
-                          {!isRunning && svc.status === 'errored' && <button className="svc-btn" onClick={() => doAction(svc.id, 'restart')}><RotateCw size={13} /><span>Restart</span></button>}
-                        </div>
-                      )}
-                      <div className="svc-expand-toggle" onClick={() => toggleCollapse(svc.id)} style={{ cursor: 'pointer' }}>
-                        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </div>
                     </div>
+
+                    {svc.isFunneled && funnel.url && (
+                      <div className="svc-funnel-url-bar">
+                        <Globe size={12} />
+                        <span>{funnel.url}</span>
+                        <button
+                          className="svc-copy-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const text = funnel.url!
+                            const ta = document.createElement('textarea')
+                            ta.value = text
+                            ta.style.position = 'fixed'
+                            ta.style.opacity = '0'
+                            document.body.appendChild(ta)
+                            ta.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(ta)
+                            const btn = e.currentTarget
+                            btn.classList.add('svc-copy-btn--copied')
+                            setTimeout(() => btn.classList.remove('svc-copy-btn--copied'), 1500)
+                          }}
+                          title="Copy URL"
+                        >
+                          <Copy size={12} className="svc-copy-icon" />
+                          <Check size={12} className="svc-check-icon" />
+                        </button>
+                      </div>
+                    )}
+
+                    {isOpen && <div className="svc-expanded-panel">{renderPanel(svc)}</div>}
                   </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
-                  {svc.isFunneled && funnel.url && (
-                    <div className="svc-funnel-url-bar">
-                      <Globe size={12} />
-                      <span>{funnel.url}</span>
-                      <button
-                        className="svc-copy-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const text = funnel.url!
-                          // Fallback for non-HTTPS contexts
-                          const ta = document.createElement('textarea')
-                          ta.value = text
-                          ta.style.position = 'fixed'
-                          ta.style.opacity = '0'
-                          document.body.appendChild(ta)
-                          ta.select()
-                          document.execCommand('copy')
-                          document.body.removeChild(ta)
-                          const btn = e.currentTarget
-                          btn.classList.add('svc-copy-btn--copied')
-                          setTimeout(() => btn.classList.remove('svc-copy-btn--copied'), 1500)
-                        }}
-                        title="Copy URL"
-                      >
-                        <Copy size={12} className="svc-copy-icon" />
-                        <Check size={12} className="svc-check-icon" />
-                      </button>
-                    </div>
-                  )}
+        <WatchdogPanel />
 
-                  {isOpen && <div className="svc-expanded-panel">{renderPanel(svc)}</div>}
-                </div>
-              )
-            })}
-          </div>
-          </>
-        )}
+        <div className="svc-footer-info">
+          Last checked {lastRefresh.toLocaleTimeString()} &middot; Auto-refreshes every 10s
+        </div>
       </div>
-
-      <WatchdogPanel />
-
-      <div className="svc-footer-info">
-        Last checked {lastRefresh.toLocaleTimeString()} · Auto-refreshes every 10s
-      </div>
+      )}
     </div>
   )
 }
