@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { execSync } from 'child_process'
+import { getMiniPower } from '@/lib/power-cache'
 
 function shell(cmd: string): string {
   try {
@@ -71,11 +72,15 @@ function getSystemStats() {
   const gpuRaw = shell("ioreg -l 2>/dev/null | grep 'PerformanceStatistics' | head -1")
   const gpuDevice = parseInt(gpuRaw.match(/"Device Utilization %"=(\d+)/)?.[1] || '0')
 
+  // Power consumption (read from background cache, non-blocking)
+  const power = getMiniPower()
+
   return {
     cpu: { user: cpuUser, sys: cpuSys, idle: cpuIdle, total: Math.round(cpuUser + cpuSys) },
     mem: { usedGB: (usedMem / 1073741824).toFixed(1), totalGB: '32', percent: memPercent },
     disk: diskMatch ? { total: diskMatch[1], used: diskMatch[2], avail: diskMatch[3], percent: parseInt(diskMatch[4]) } : null,
     gpu: { device: gpuDevice },
+    power,
   }
 }
 

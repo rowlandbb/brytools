@@ -18,6 +18,7 @@ interface StudioTelemetry {
   mem: { usedGB: string; totalGB: string; percent: number; activeGB: string; wiredGB: string; compressedGB: string; freeGB: string }
   gpu: { device: number; renderer: number; tiler: number; allocGB: string; inUseGB: string }
   disk: { total: string; used: string; avail: string; percent: number } | null
+  power: { watts: number }
   uptime: string
   loadAvg: number[]
   machine: { cores: number; chip: string; ramGB: number }
@@ -252,12 +253,13 @@ export default function MacStudioTab() {
       {/* GPU Activity Graph */}
       <GpuGraph history={gpuHistory} />
 
-      {/* Gauges: CPU, GPU, RAM, Storage */}
-      <div className="svc-gauges svc-gauges--four">
+      {/* Gauges: CPU, GPU, RAM, Storage, Power */}
+      <div className="svc-gauges svc-gauges--five">
         <Gauge value={telem.cpu.total} max={100} label="CPU" unit="%" color="var(--accent)" />
         <Gauge value={telem.gpu.device} max={100} label="GPU" unit="%" color="var(--purple)" />
         <Gauge value={telem.mem.percent} max={100} label="RAM" unit={`${telem.mem.usedGB}/${telem.mem.totalGB} GB`} color="var(--green)" />
         {telem.disk && <Gauge value={telem.disk.percent} max={100} label="Storage" unit={`${telem.disk.avail} free`} color={telem.disk.percent > 85 ? 'var(--red)' : 'var(--accent-dim)'} />}
+        <Gauge value={telem.power?.watts || 0} max={200} label="Power" unit="W" color="var(--purple)" />
       </div>
 
       {/* Machine info + uptime */}

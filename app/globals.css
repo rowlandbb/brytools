@@ -3743,8 +3743,20 @@ body {
   gap: 0;
 }
 
+/* 5-gauge layout */
+
+.svc-gauges--five {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+}
+
 @media (max-width: 639px) {
   .svc-gauges--four {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .svc-gauges--five {
     grid-template-columns: repeat(2, 1fr);
   }
 

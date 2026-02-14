@@ -16,6 +16,11 @@ function writeConfig(cfg: Record<string, string>) {
   writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2))
 }
 
+function getUid(): string {
+  try { return execSync('id -u', { encoding: 'utf-8' }).trim() }
+  catch { return '501' }
+}
+
 function isLoaded(): boolean {
   try {
     const out = execSync('launchctl list 2>/dev/null', { encoding: 'utf-8' })
@@ -35,11 +40,12 @@ export async function POST(req: NextRequest) {
   // Toggle enabled/disabled
   if (body.action === 'toggle') {
     const loaded = isLoaded()
+    const uid = getUid()
     try {
       if (loaded) {
-        execSync(`launchctl unload ${PLIST} 2>/dev/null`)
+        execSync(`launchctl bootout gui/${uid}/com.bryanrowland.brytools-watchdog 2>/dev/null`)
       } else {
-        execSync(`launchctl load ${PLIST} 2>/dev/null`)
+        execSync(`launchctl bootstrap gui/${uid} ${PLIST} 2>/dev/null`)
       }
     } catch { /* ignore */ }
     return NextResponse.json({ ok: true, enabled: !loaded })

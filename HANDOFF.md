@@ -1,6 +1,6 @@
 # BRYTOOLS HANDOFF
 **Last Updated**: February 13, 2026
-**Status**: Phase 1 (Transcribe) + Phase 2 (Import/Dump) + Phase 4 (File Browser) + Phase 5 (Services Dashboard) + Phase 6 (Mac Studio Remote Monitoring) COMPLETE.
+**Status**: Phase 1 (Transcribe) + Phase 2 (Import/Dump) + Phase 4 (File Browser) + Phase 5 (Services Dashboard) + Phase 6 (Mac Studio Remote Monitoring) + Power Monitoring COMPLETE.
 
 ---
 
@@ -23,7 +23,7 @@ The Services tab has two sub-tabs: **Mac Mini** and **Mac Studio**. Both follow 
 ### Mac Mini Tab
 Top-level system telemetry rendered directly (no service block wrapper):
 1. **Network Heartbeat EKG** -- shared component (`heartbeat.tsx`) showing live download/upload throughput with SVG waveform and integrated speed test
-2. **Four gauges** -- CPU, GPU, RAM, Storage (4-col desktop, 2-col mobile)
+2. **Five gauges** -- CPU, GPU, RAM, Storage, Power (5-col desktop, 2-col mobile)
 3. **Machine bar** -- Mac Mini M2 Pro specs
 4. **Uptime bar** -- system uptime + load averages
 5. **Stats grid** -- Downloads count, Transcripts count, Dump folder size
@@ -43,7 +43,7 @@ Below services, the **Watchdog** panel:
 Top-level system telemetry (same pattern as Mini):
 1. **Network Heartbeat EKG** -- same shared component
 2. **GPU Activity Graph** -- rolling SVG line chart of GPU Device Utilization %
-3. **Four gauges** -- CPU, GPU, RAM, Storage
+3. **Five gauges** -- CPU, GPU, RAM, Storage, Power (5-col desktop, 2-col mobile)
 4. **Machine bar** -- Mac Studio M3 Ultra specs
 5. **Uptime bar** -- system uptime + load averages
 
@@ -97,6 +97,9 @@ brytools start
 2. Mount external volumes (`ME Backup02` for transcription and dump storage)
 3. Set watchdog phone number in the Services UI
 4. Set up SSH key for Mac Studio (`ssh-copy-id bryan@100.100.179.121`) if Scribe tab is needed
+5. Enable passwordless `powermetrics` for the Power gauge on each machine:
+   - Mac Mini: `echo "bryanrowland ALL=(ALL) NOPASSWD: /usr/bin/powermetrics" | sudo tee /etc/sudoers.d/powermetrics`
+   - Mac Studio: `echo "bryan ALL=(ALL) NOPASSWD: /usr/bin/powermetrics" | sudo tee /etc/sudoers.d/powermetrics`
 
 ---
 

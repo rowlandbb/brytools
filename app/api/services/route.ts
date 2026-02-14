@@ -18,7 +18,7 @@ const SERVICES: ServiceDef[] = [
   {
     id: 'brytools',
     label: 'BryTools',
-    plist: 'com.bryan.brytools-app',
+    plist: 'com.brytools.server',
     port: 3002,
     type: 'Node.js',
     description: 'Unified personal toolbox',

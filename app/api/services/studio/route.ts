@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { execSync } from 'child_process'
+import { getStudioPower } from '@/lib/power-cache'
 
 const STUDIO_SSH = 'ssh -o BatchMode=yes -o ConnectTimeout=5 bryan@100.100.179.121'
 
@@ -112,9 +113,12 @@ export async function GET() {
   const ncpu = parseInt(sections.NCPU || '0')
   const cpuBrand = sections.CPUBRAND || 'Unknown'
 
+  // Power (read from background cache, non-blocking)
+  const power = getStudioPower()
+
   return NextResponse.json({
     reachable: true,
-    cpu, mem, gpu, disk,
+    cpu, mem, gpu, disk, power,
     uptime, loadAvg,
     machine: { cores: ncpu, chip: cpuBrand, ramGB: Math.round(totalMem / 1073741824) },
   })

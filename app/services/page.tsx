@@ -525,18 +525,20 @@ export default function ServicesPage() {
 
         {/* Gauges: CPU, GPU, RAM, Storage */}
         {brytoolsSys ? (
-          <div className="svc-gauges svc-gauges--four">
+          <div className="svc-gauges svc-gauges--five">
             <Gauge value={brytoolsSys.cpu.total} max={100} label="CPU" unit="%" color="var(--accent)" />
             <Gauge value={brytoolsSys.gpu?.device || 0} max={100} label="GPU" unit="%" color="var(--purple, #a78bfa)" />
             <Gauge value={brytoolsSys.mem.percent} max={100} label="RAM" unit={`${brytoolsSys.mem.usedGB}/${brytoolsSys.mem.totalGB} GB`} color="var(--green)" />
             {brytoolsSys.disk && <Gauge value={brytoolsSys.disk.percent} max={100} label="Storage" unit={`${brytoolsSys.disk.avail} free`} color={brytoolsSys.disk.percent > 85 ? 'var(--red)' : 'var(--accent-dim)'} />}
+            <Gauge value={brytoolsSys.power?.watts || 0} max={60} label="Power" unit="W" color="var(--accent)" />
           </div>
         ) : (
-          <div className="svc-gauges svc-gauges--four">
+          <div className="svc-gauges svc-gauges--five">
             <Gauge value={0} max={100} label="CPU" unit="%" color="var(--accent)" />
             <Gauge value={0} max={100} label="GPU" unit="%" color="var(--purple, #a78bfa)" />
             <Gauge value={0} max={100} label="RAM" unit="..." color="var(--green)" />
             <Gauge value={0} max={100} label="Storage" unit="..." color="var(--accent-dim)" />
+            <Gauge value={0} max={60} label="Power" unit="W" color="var(--accent)" />
           </div>
         )}
 
