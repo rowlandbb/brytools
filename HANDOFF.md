@@ -1,5 +1,5 @@
 # BRYTOOLS HANDOFF
-**Last Updated**: February 13, 2026
+**Last Updated**: February 14, 2026
 **Status**: Phase 1 (Transcribe) + Phase 2 (Import/Dump) + Phase 4 (File Browser) + Phase 5 (Services Dashboard) + Phase 6 (Mac Studio Remote Monitoring) + Power Monitoring COMPLETE.
 
 ---
@@ -27,10 +27,10 @@ Top-level system telemetry rendered directly (no service block wrapper):
 3. **Machine bar** -- Mac Mini M2 Pro specs
 4. **Uptime bar** -- system uptime + load averages
 5. **Stats grid** -- Downloads count, Transcripts count, Dump folder size
-6. **Mounted Volumes** -- RowMedia, LucidLink status with usage bars
+6. **Mounted Volumes** -- RowMedia and other external volumes with usage bars
 
 Below system telemetry, a **Services** section with collapsible panels:
-- **Skinwalker Archive** -- LucidLink status, canon entries, source files, request counts, memory usage, recent activity, log tail
+- **Skinwalker Archive** -- canon entries, source files, request counts, memory usage, recent activity, log tail
 
 Below services, the **Watchdog** panel:
 - Enable/disable toggle (loads/unloads launchd service)
@@ -64,12 +64,11 @@ Below telemetry, **Ollama** as a collapsible service panel:
 A bash script (`~/.brytools-watchdog/watchdog.sh`) run by launchd every 60 seconds. Checks:
 - BryTools (port 3002)
 - Skinwalker Archive (port 5001)
-- LucidLink volume mount
 - RowMedia volume mount
 
 Sends iMessage alerts via AppleScript with 5-minute cooldown between repeat alerts. Recovery alerts sent when services come back. Config stored in `~/.brytools-watchdog/config.json`. The watchdog can be enabled/disabled from the Services UI, which loads/unloads the launchd plist.
 
-Note: Ollama was removed from watchdog monitoring since it runs on Mac Studio and shouldn't be checked from the Mini.
+Note: Ollama was removed from watchdog monitoring since it runs on Mac Studio and shouldn't be checked from the Mini. LucidLink monitoring was removed after the Skinwalker Archive migrated to local data storage.
 
 ---
 

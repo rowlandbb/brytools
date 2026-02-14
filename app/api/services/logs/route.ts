@@ -42,7 +42,7 @@ function getVolumes() {
     { path: '/Volumes/RowMedia', label: 'RowMedia', needs: ['brytools'] },
     { path: '/Volumes/ME Backup02', label: 'ME Backup02', needs: ['brytools'] },
     { path: '/Volumes/ME Backup01', label: 'ME Backup01', needs: [] },
-    { path: '/Volumes/bryan/bryan/Canon', label: 'LucidLink (Canon)', needs: ['skinwalker-archive'] },
+
     { path: '/Volumes/bryan-1', label: 'Mac Studio (SMB)', needs: [] },
   ]
   return important.map(v => ({ ...checkVolume(v.path), label: v.label, needs: v.needs }))
@@ -126,7 +126,7 @@ function getSkinwalkerTelemetry() {
     recentActivity,
     memory: mem,
     connections: parseInt(connections) || 0,
-    lucidLink: checkVolume('/Volumes/bryan/bryan/Canon'),
+
   }
 }
 

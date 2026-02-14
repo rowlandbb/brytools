@@ -153,16 +153,8 @@ function statusColor(s: Service): string {
 
 function SkinwalkerPanel({ telemetry: t, logs, plist }: { telemetry: Telemetry; logs: string[]; plist: string }) {
   if (!t?.canonEntries) return <div className="svc-telem-loading">Collecting telemetry...</div>
-  const lucid = t.lucidLink
   return (
     <div className="svc-telem">
-      {/* LucidLink status bar */}
-      <div className={`svc-volume-alert ${lucid?.mounted ? 'svc-volume-alert--ok' : 'svc-volume-alert--warn'}`}>
-        <HardDrive size={14} />
-        <span className="svc-volume-alert-label">LucidLink</span>
-        <span className="svc-volume-alert-status">{lucid?.mounted ? 'Mounted' : 'NOT MOUNTED'}</span>
-        {lucid?.mounted && lucid?.avail && <span className="svc-volume-alert-detail">{lucid.avail} free of {lucid.total}</span>}
-      </div>
       <div className="svc-telem-grid">
         <Stat icon={<Database size={16} />} label="Canon Entries" value={t.canonEntries.toLocaleString()} sub="JSON documents indexed" />
         <Stat icon={<FileText size={16} />} label="Source Scripts" value={t.sourceFiles} sub="Master documents" />
@@ -343,7 +335,7 @@ function WatchdogPanel() {
   const eventLabel = (event: string, service: string) => {
     const names: Record<string, string> = {
       brytools: 'BryTools', skinwalker: 'Skinwalker Archive', ollama: 'Ollama',
-      lucidlink: 'LucidLink', vol_rowmedia: 'RowMedia',
+      vol_rowmedia: 'RowMedia',
     }
     const name = names[service] || service
     return event === 'recovered' ? `${name} recovered` : `${name} went down`
@@ -391,7 +383,7 @@ function WatchdogPanel() {
             )}
           </div>
           <div className="svc-watchdog-hint">
-            Checks every 60s. Alerts on service crashes, LucidLink disconnects, volume failures. 5min cooldown between repeat alerts.
+            Checks every 60s. Alerts on service crashes and volume failures. 5min cooldown between repeat alerts.
           </div>
         </div>
 
