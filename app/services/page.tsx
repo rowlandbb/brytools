@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Play, Square, RotateCw, ChevronDown, ChevronRight,
   Globe, Lock, RefreshCw, Database, FileText, Cpu,
-  HardDrive, Activity, Zap, Brain, Server, Terminal,
+  HardDrive, Activity, Zap, Server, Terminal,
   Wrench, Eye, Copy, Check, Monitor,
 } from 'lucide-react'
 import MacStudioTab from './mac-studio-tab'
@@ -47,14 +47,6 @@ const SERVICE_BRAND: Record<string, {
     accentDim: 'rgba(107, 143, 114, 0.5)',
     className: 'svc-brand--skinwalker',
   },
-  ollama: {
-    icon: <Brain size={18} />,
-    wordmark: 'OLLAMA',
-    subtitle: 'Mac Studio',
-    accent: 'var(--purple, #a78bfa)',
-    accentDim: 'rgba(167, 139, 250, 0.4)',
-    className: 'svc-brand--ollama',
-  },
 }
 
 // Heartbeat imported from ./heartbeat.tsx
@@ -83,11 +75,6 @@ function Gauge({ value, max, label, unit, color }: { value: number; max: number;
       <span className="svc-gauge-label">{label}</span>
     </div>
   )
-}
-
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  return <div className="svc-mini-bar"><div className="svc-mini-bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
 }
 
 function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
@@ -138,9 +125,6 @@ function statusLabel(s: Service): string {
   if (s.status === 'running') return s.port && !s.portOpen ? 'Starting' : 'Running'
   if (s.status === 'errored') return `Errored (exit ${s.exitCode})`
   return 'Stopped'
-}
-function isRemote(s: Service): boolean {
-  return s.type === 'Mac Studio'
 }
 function statusColor(s: Service): string {
   if (s.status === 'running' && (!s.port || s.portOpen)) return 'var(--green)'
@@ -227,183 +211,6 @@ function BrytoolsPanel({ telemetry: t, logs, plist }: { telemetry: Telemetry; lo
   )
 }
 
-function OllamaPanel({ telemetry: t, logs, plist }: { telemetry: Telemetry; logs: string[]; plist: string }) {
-  if (!t?.models) return <div className="svc-telem-loading">Collecting telemetry...</div>
-  const hasRunning = t.runningModels?.length > 0
-  return (
-    <div className="svc-telem">
-      <div className="svc-telem-grid">
-        <Stat icon={<Brain size={16} />} label="Models Installed" value={t.models.length} sub={t.models.map((m: any) => m.name).join(', ') || 'None'} />
-        <Stat icon={<Zap size={16} />} label="Status" value={hasRunning ? 'Model Loaded' : 'Idle'} sub={hasRunning ? t.runningModels[0].name : 'No model in memory'} />
-        <Stat icon={<Activity size={16} />} label="Process Memory" value={t.memory || 'N/A'} sub={hasRunning ? `VRAM: ${t.runningModels[0].vramPercent}%` : 'Baseline'} />
-      </div>
-      {t.models.length > 0 && (
-        <div className="svc-model-list">
-          <div className="svc-activity-label">Model Inventory</div>
-          {t.models.map((m: any, i: number) => (
-            <div key={i} className="svc-model-row">
-              <div className="svc-model-name">
-                <Brain size={13} />
-                <span>{m.name}</span>
-                {hasRunning && t.runningModels.some((r: any) => r.name === m.name) && (
-                  <span className="svc-model-active-badge">Active</span>
-                )}
-              </div>
-              <div className="svc-model-specs">
-                <span>{m.params}</span><span className="svc-model-divider">·</span>
-                <span>{m.quant}</span><span className="svc-model-divider">·</span>
-                <span>{m.size}</span><span className="svc-model-divider">·</span>
-                <span>{m.family}</span>
-              </div>
-              <MiniBar value={parseFloat(m.size)} max={32} color="var(--accent-dim)" />
-            </div>
-          ))}
-        </div>
-      )}
-      <LogTail logs={logs} plist={plist} />
-    </div>
-  )
-}
-
-// ─── Watchdog Panel ───
-
-interface Incident { ts: string; service: string; event: string }
-
-function WatchdogPanel() {
-  const [alertTo, setAlertTo] = useState('')
-  const [inputVal, setInputVal] = useState('')
-  const [enabled, setEnabled] = useState(false)
-  const [incidents, setIncidents] = useState<Incident[]>([])
-  const [saving, setSaving] = useState(false)
-  const [testSent, setTestSent] = useState(false)
-  const [toggling, setToggling] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/services/watchdog').then(r => r.json()).then(d => {
-      setAlertTo(d.alertTo || '')
-      setInputVal(d.alertTo || '')
-      setEnabled(d.enabled)
-    }).catch(() => {})
-    fetch('/api/services/incidents').then(r => r.json()).then(d => {
-      setIncidents(d.incidents || [])
-    }).catch(() => {})
-  }, [])
-
-  const savePhone = async () => {
-    setSaving(true)
-    try {
-      const res = await fetch('/api/services/watchdog', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alertTo: inputVal })
-      })
-      const d = await res.json()
-      if (d.ok) { setAlertTo(d.alertTo); setEnabled(!!d.alertTo) }
-    } catch { /* ignore */ }
-    finally { setSaving(false) }
-  }
-
-  const sendTest = async () => {
-    setTestSent(false)
-    try {
-      await fetch('/api/services/watchdog/test', { method: 'POST' })
-      setTestSent(true)
-      setTimeout(() => setTestSent(false), 5000)
-    } catch { /* ignore */ }
-  }
-
-  const toggleWatchdog = async () => {
-    setToggling(true)
-    try {
-      const res = await fetch('/api/services/watchdog', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'toggle' })
-      })
-      const d = await res.json()
-      if (d.ok) setEnabled(d.enabled)
-    } catch { /* ignore */ }
-    finally { setToggling(false) }
-  }
-
-  const formatTs = (ts: string) => {
-    try {
-      const d = new Date(ts)
-      return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
-    } catch { return ts }
-  }
-
-  const eventIcon = (event: string) => event === 'recovered' ? '✅' : '🔴'
-  const eventLabel = (event: string, service: string) => {
-    const names: Record<string, string> = {
-      brytools: 'BryTools', skinwalker: 'Skinwalker Archive', ollama: 'Ollama',
-      vol_rowmedia: 'RowMedia',
-    }
-    const name = names[service] || service
-    return event === 'recovered' ? `${name} recovered` : `${name} went down`
-  }
-
-  return (
-    <div className="section" style={{ marginTop: 16 }}>
-      <div className="section-label">
-        <span>Watchdog</span>
-        <span className={`svc-watchdog-status ${enabled ? 'svc-watchdog-status--on' : ''}`}>
-          {enabled ? 'Running' : 'Disabled'}
-        </span>
-        <button
-          className={`svc-btn ${enabled ? 'svc-btn--stop' : ''}`}
-          onClick={toggleWatchdog}
-          disabled={toggling}
-          style={{ marginLeft: 'auto' }}
-        >
-          <span>{toggling ? '...' : enabled ? 'Disable' : 'Enable'}</span>
-        </button>
-      </div>
-      <div className="svc-service-block">
-        <div className="svc-watchdog-config">
-          <div className="svc-watchdog-row">
-            <div className="svc-watchdog-label">
-              <Activity size={14} />
-              <span>iMessage Alerts</span>
-            </div>
-          </div>
-          <div className="svc-watchdog-row">
-            <input
-              className="svc-watchdog-input"
-              type="tel"
-              placeholder="+1 (555) 123-4567"
-              value={inputVal}
-              onChange={e => setInputVal(e.target.value)}
-            />
-            <button className="svc-btn" onClick={savePhone} disabled={saving || inputVal === alertTo}>
-              <span>{saving ? 'Saving...' : 'Save'}</span>
-            </button>
-            {enabled && (
-              <button className="svc-btn" onClick={sendTest}>
-                <span>{testSent ? 'Sent!' : 'Test'}</span>
-              </button>
-            )}
-          </div>
-          <div className="svc-watchdog-hint">
-            Checks every 60s. Alerts on service crashes and volume failures. 5min cooldown between repeat alerts.
-          </div>
-        </div>
-
-        {incidents.length > 0 && (
-          <div className="svc-incidents">
-            <div className="svc-activity-label">Incident History</div>
-            {incidents.slice(-5).map((inc, i) => (
-              <div key={i} className="svc-incident-row">
-                <span className="svc-incident-icon">{eventIcon(inc.event)}</span>
-                <span className="svc-incident-text">{eventLabel(inc.event, inc.service)}</span>
-                <span className="svc-incident-time">{formatTs(inc.ts)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Main Component ───
 
 export default function ServicesPage() {
@@ -477,7 +284,6 @@ export default function ServicesPage() {
     switch (svc.id) {
       case 'skinwalker-archive': return <SkinwalkerPanel telemetry={svcTelem} logs={svcLogs} plist={svc.plist} />
       case 'brytools': return <BrytoolsPanel telemetry={svcTelem} logs={svcLogs} plist={svc.plist} />
-      case 'ollama': return <OllamaPanel telemetry={svcTelem} logs={svcLogs} plist={svc.plist} />
       default: return null
     }
   }
@@ -703,8 +509,6 @@ export default function ServicesPage() {
             </div>
           )}
         </div>
-
-        <WatchdogPanel />
 
         <div className="svc-footer-info">
           Last checked {lastRefresh.toLocaleTimeString()} &middot; Auto-refreshes every 10s

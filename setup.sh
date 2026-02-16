@@ -251,22 +251,6 @@ else
   green "✓ ~/bin already in PATH"
 fi
 
-# ── Install watchdog ─────────────────────
-WATCHDOG_DIR="$HOME/.brytools-watchdog"
-if [ ! -d "$WATCHDOG_DIR" ]; then
-  mkdir -p "$WATCHDOG_DIR"
-  echo '{"alertTo":""}' > "$WATCHDOG_DIR/config.json"
-  green "✓ Watchdog config created (set phone number in Services UI)"
-else
-  green "✓ Watchdog config exists"
-fi
-
-# Check for watchdog script in repo and copy if present
-if [ -f "$PROJECT/com.bryanrowland.brytools-watchdog.plist" ]; then
-  cp "$PROJECT/com.bryanrowland.brytools-watchdog.plist" "$HOME/Library/LaunchAgents/"
-  green "✓ Watchdog plist installed"
-fi
-
 # ── Install launchd plist ────────────────
 PLIST_SRC="$PROJECT/com.bryanrowland.brytools.plist"
 if [ -f "$PLIST_SRC" ]; then

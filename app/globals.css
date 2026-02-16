@@ -2554,7 +2554,7 @@ body {
   color: var(--accent-dim);
 }
 
-/* Model list (Ollama) */
+/* Model list */
 .svc-model-list {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -2976,7 +2976,7 @@ body {
     flex: 1;
   }
 
-  /* ─ Model list (Ollama) ─ */
+  /* ─ Model list ─ */
   .svc-model-row {
     padding: 8px 10px;
   }
@@ -3050,131 +3050,6 @@ body {
 }
 
 
-/* ════════════════════════════════════════════
-   Services -- Watchdog
-   ════════════════════════════════════════════ */
-
-.svc-watchdog-config {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.svc-watchdog-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.svc-watchdog-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text);
-}
-
-.svc-watchdog-label svg {
-  color: var(--accent-dim);
-}
-
-.svc-watchdog-status {
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-}
-
-.svc-watchdog-status--on {
-  color: var(--green);
-  border-color: rgba(107, 143, 114, 0.25);
-}
-
-.svc-watchdog-input {
-  flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-hi);
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 13px;
-  padding: 6px 10px;
-  outline: none;
-  max-width: 220px;
-}
-
-.svc-watchdog-input:focus {
-  border-color: var(--accent-dim);
-}
-
-.svc-watchdog-input::placeholder {
-  color: var(--text-muted);
-}
-
-.svc-watchdog-hint {
-  font-size: 11px;
-  font-weight: 300;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-/* Incident history */
-.svc-incidents {
-  border-top: 1px solid var(--border);
-}
-
-.svc-incident-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-}
-
-.svc-incident-row:last-child {
-  border-bottom: none;
-}
-
-.svc-incident-icon {
-  flex-shrink: 0;
-  font-size: 11px;
-}
-
-.svc-incident-text {
-  flex: 1;
-  color: var(--text-dim);
-  font-weight: 300;
-}
-
-.svc-incident-time {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 300;
-}
-
-/* Mobile watchdog */
-@media (max-width: 639px) {
-  .svc-watchdog-config {
-    padding: 10px 12px;
-  }
-  .svc-watchdog-row {
-    flex-wrap: wrap;
-  }
-  .svc-watchdog-input {
-    max-width: none;
-    width: 100%;
-  }
-  .svc-incident-row {
-    padding: 5px 12px;
-    font-size: 11px;
-  }
-}
 
 
 /* ════════════════════════════════════════════
@@ -3262,30 +3137,6 @@ body {
   background: linear-gradient(90deg, rgba(107, 143, 114, 0.08) 0%, transparent 60%);
 }
 
-/* ─ Ollama: Purple accent, neural ─ */
-
-.svc-brand--ollama {
-}
-
-.svc-brand--ollama .svc-brand-icon {
-  color: var(--purple);
-}
-
-.svc-brand--ollama .svc-brand-name {
-  color: var(--purple);
-}
-
-.svc-brand--ollama .svc-brand-sub {
-  color: var(--purple);
-}
-
-.svc-brand--ollama .svc-header {
-  background: linear-gradient(90deg, rgba(167, 139, 250, 0.04) 0%, transparent 60%);
-}
-
-.svc-brand--ollama .svc-header:hover {
-  background: linear-gradient(90deg, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
-}
 
 /* ─ Brand-colored alive dots ─ */
 
@@ -3297,10 +3148,6 @@ body {
   box-shadow: 0 0 6px 2px rgba(107, 143, 114, 0.4);
 }
 
-.svc-brand--ollama .svc-dot--alive {
-  box-shadow: 0 0 6px 2px rgba(167, 139, 250, 0.4);
-}
-
 /* ─ Brand-colored expanded panel top borders ─ */
 
 .svc-brand--brytools .svc-header--open {
@@ -3309,10 +3156,6 @@ body {
 
 .svc-brand--skinwalker .svc-header--open {
   border-bottom-color: rgba(107, 143, 114, 0.15);
-}
-
-.svc-brand--ollama .svc-header--open {
-  border-bottom-color: rgba(167, 139, 250, 0.15);
 }
 
 /* ─ Mobile branded headers ─ */
@@ -3411,39 +3254,6 @@ body {
 .svc-brand--skinwalker .svc-log-toggle {
   border-top-color: rgba(107, 143, 114, 0.1);
 }
-
-/* ─ Ollama: Full panel purple tint ─ */
-
-.svc-brand--ollama {
-  border-color: rgba(167, 139, 250, 0.2);
-  background: rgba(167, 139, 250, 0.02);
-}
-
-.svc-brand--ollama .svc-expanded-panel {
-  background: rgba(167, 139, 250, 0.02);
-}
-
-.svc-brand--ollama .svc-telem {
-  background: transparent;
-}
-
-.svc-brand--ollama .svc-stat {
-  border-color: rgba(167, 139, 250, 0.12);
-  background: rgba(167, 139, 250, 0.03);
-}
-
-.svc-brand--ollama .svc-model-row {
-  border-bottom-color: rgba(167, 139, 250, 0.1);
-}
-
-.svc-brand--ollama .svc-activity-label {
-  border-bottom-color: rgba(167, 139, 250, 0.1);
-}
-
-.svc-brand--ollama .svc-log-toggle {
-  border-top-color: rgba(167, 139, 250, 0.1);
-}
-
 
 /* ════════════════════════════════════════════
    Services -- Speed Test

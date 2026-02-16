@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Play, Square, RotateCw, ChevronDown, ChevronRight,
-  RefreshCw, Brain, Server, Terminal, Activity, Zap,
-  Cpu, HardDrive,
+  RefreshCw, Server, Zap,
+  Cpu,
 } from 'lucide-react'
 import Heartbeat from './heartbeat'
 
@@ -22,17 +21,6 @@ interface StudioTelemetry {
   uptime: string
   loadAvg: number[]
   machine: { cores: number; chip: string; ramGB: number }
-}
-
-interface OllamaTelemetry {
-  models: { name: string; size: string; family: string; params: string; quant: string }[]
-  runningModels: { name: string; size: string; vramPercent: number }[]
-  memory: string | null
-}
-
-interface OllamaService {
-  status: 'running' | 'stopped' | 'errored'
-  portOpen: boolean
 }
 
 // ─── Gauge ───
@@ -120,65 +108,13 @@ function GpuGraph({ history }: { history: number[] }) {
   )
 }
 
-// ─── Log Tail ───
-
-function LogTail({ logs, label }: { logs: string[]; label: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="svc-log-section">
-      <div className="svc-log-toggle" onClick={() => setOpen(!open)}>
-        <Terminal size={12} />
-        <span>Log tail</span>
-        <span className="svc-log-plist">{label}</span>
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-      </div>
-      {open && <pre className="svc-log-content">{logs.join('\n')}</pre>}
-    </div>
-  )
-}
-
-// ─── Model Grid ───
-
-function ModelGrid({ models, runningModels }: { models: any[]; runningModels: any[] }) {
-  const runningNames = new Set(runningModels.map((r: any) => r.name))
-  return (
-    <div className="studio-model-grid">
-      {models.map((m: any, i: number) => {
-        const isActive = runningNames.has(m.name)
-        return (
-          <div key={i} className={`studio-model-tile ${isActive ? 'studio-model-tile--active' : ''}`}>
-            <div className="studio-model-tile-header">
-              <Brain size={13} />
-              <span className="studio-model-tile-name">{m.name.split(':')[0]}</span>
-              {isActive && <span className="studio-model-tile-badge">Active</span>}
-            </div>
-            <div className="studio-model-tile-specs">
-              <span>{m.params}</span>
-              <span className="svc-model-divider">&middot;</span>
-              <span>{m.quant}</span>
-              <span className="svc-model-divider">&middot;</span>
-              <span>{m.size}</span>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ─── Main Studio Tab ───
 
 export default function MacStudioTab() {
   const [telem, setTelem] = useState<StudioTelemetry | null>(null)
-  const [ollama, setOllama] = useState<OllamaTelemetry | null>(null)
-  const [ollamaStatus, setOllamaStatus] = useState<OllamaService | null>(null)
-  const [ollamaLogs, setOllamaLogs] = useState<string[]>([])
   const [gpuHistory, setGpuHistory] = useState<number[]>([])
   const [unreachable, setUnreachable] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(new Date())
-  const [actionPending, setActionPending] = useState<string | null>(null)
-  const [confirmAction, setConfirmAction] = useState<string | null>(null)
-  const [ollamaOpen, setOllamaOpen] = useState(true)
 
   const fetchTelemetry = useCallback(async () => {
     try {
@@ -192,38 +128,11 @@ export default function MacStudioTab() {
     } catch { setUnreachable(true) }
   }, [])
 
-  const fetchOllama = useCallback(async () => {
-    try {
-      // Get ollama service status
-      const svcRes = await fetch('/api/services')
-      const svcData = await svcRes.json()
-      const ollamaSvc = svcData.services?.find((s: any) => s.id === 'ollama')
-      if (ollamaSvc) setOllamaStatus(ollamaSvc)
-
-      // Get ollama telemetry + logs
-      const logRes = await fetch('/api/services/logs?id=ollama')
-      const logData = await logRes.json()
-      if (logData.telemetry) setOllama(logData.telemetry)
-      if (logData.lines) setOllamaLogs(logData.lines)
-    } catch { /* ignore */ }
-  }, [])
-
   useEffect(() => {
     fetchTelemetry()
-    fetchOllama()
-    const iv1 = setInterval(fetchTelemetry, 6000)
-    const iv2 = setInterval(fetchOllama, 8000)
-    return () => { clearInterval(iv1); clearInterval(iv2) }
-  }, [fetchTelemetry, fetchOllama])
-
-  const doOllamaAction = async (action: string) => {
-    setActionPending(action); setConfirmAction(null)
-    try {
-      await fetch('/api/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'ollama', action }) })
-      await fetchOllama()
-    } catch { /* ignore */ }
-    finally { setActionPending(null) }
-  }
+    const iv = setInterval(fetchTelemetry, 6000)
+    return () => clearInterval(iv)
+  }, [fetchTelemetry])
 
   if (unreachable) {
     return (
@@ -241,9 +150,6 @@ export default function MacStudioTab() {
   if (!telem) {
     return <div className="svc-telem-loading">Connecting to Mac Studio...</div>
   }
-
-  const isOllamaRunning = ollamaStatus?.status === 'running'
-  const hasRunning = (ollama?.runningModels?.length || 0) > 0
 
   return (
     <div className="studio-tab">
@@ -268,95 +174,6 @@ export default function MacStudioTab() {
         <Server size={13} />
         <span>Up {telem.uptime}</span>
         <span className="studio-uptime-load">Load: {telem.loadAvg.map(l => l.toFixed(2)).join(' \u00b7 ')}</span>
-      </div>
-
-      {/* Ollama Service Panel */}
-      <div className="svc-service-block svc-brand--ollama" style={{ marginTop: 16 }}>
-        <div className={`svc-header ${ollamaOpen ? 'svc-header--open' : ''}`}>
-          <div className="svc-header-left" onClick={() => setOllamaOpen(!ollamaOpen)} style={{ cursor: 'pointer' }}>
-            <div className={`svc-dot ${isOllamaRunning ? 'svc-dot--alive' : ''}`} style={{ background: isOllamaRunning ? 'var(--green)' : 'var(--text-muted)' }} />
-            <div className="svc-header-info">
-              <div className="svc-brand-wordmark">
-                <span className="svc-brand-icon"><Brain size={18} /></span>
-                <span className="svc-brand-name">OLLAMA</span>
-                <span className="svc-brand-sub">Inference</span>
-              </div>
-              <span className="svc-header-detail">
-                {isOllamaRunning ? 'Running' : 'Stopped'}
-                {hasRunning ? ` \u00b7 ${ollama!.runningModels[0].name}` : ''}
-                {ollama?.memory ? ` \u00b7 ${ollama.memory}` : ''}
-              </span>
-            </div>
-          </div>
-          <div className="svc-header-right">
-            {actionPending ? (
-              <div className="svc-spinner"><RotateCw size={14} /></div>
-            ) : confirmAction ? (
-              <div className="confirm-group">
-                <button className="btn-confirm-delete" onClick={() => doOllamaAction(confirmAction)}>
-                  {confirmAction === 'stop' ? 'Stop' : 'Restart'}
-                </button>
-                <button className="btn-cancel" onClick={() => setConfirmAction(null)}>Cancel</button>
-              </div>
-            ) : (
-              <div className="svc-btns">
-                {!isOllamaRunning && <button className="svc-btn" onClick={() => doOllamaAction('start')}><Play size={13} /><span>Start</span></button>}
-                {isOllamaRunning && (
-                  <>
-                    <button className="svc-btn" onClick={() => setConfirmAction('restart')} title="Restart"><RotateCw size={13} /></button>
-                    <button className="svc-btn svc-btn--stop" onClick={() => setConfirmAction('stop')} title="Stop"><Square size={13} /></button>
-                  </>
-                )}
-              </div>
-            )}
-            <div className="svc-expand-toggle" onClick={() => setOllamaOpen(!ollamaOpen)} style={{ cursor: 'pointer' }}>
-              {ollamaOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </div>
-          </div>
-        </div>
-
-        {ollamaOpen && ollama && (
-          <div className="svc-expanded-panel">
-            <div className="svc-telem">
-              {/* Stats row */}
-              <div className="svc-telem-grid">
-                <div className="svc-stat">
-                  <div className="svc-stat-icon"><Brain size={16} /></div>
-                  <div className="svc-stat-text">
-                    <div className="svc-stat-value">{ollama.models.length}</div>
-                    <div className="svc-stat-label">Models</div>
-                  </div>
-                </div>
-                <div className="svc-stat">
-                  <div className="svc-stat-icon"><Zap size={16} /></div>
-                  <div className="svc-stat-text">
-                    <div className="svc-stat-value">{hasRunning ? 'Loaded' : 'Idle'}</div>
-                    <div className="svc-stat-label">Status</div>
-                    {hasRunning && <div className="svc-stat-sub">{ollama.runningModels[0].name}</div>}
-                  </div>
-                </div>
-                <div className="svc-stat">
-                  <div className="svc-stat-icon"><Activity size={16} /></div>
-                  <div className="svc-stat-text">
-                    <div className="svc-stat-value">{telem.gpu.allocGB} GB</div>
-                    <div className="svc-stat-label">GPU Alloc</div>
-                    <div className="svc-stat-sub">of {telem.machine.ramGB} GB unified</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Model Grid */}
-              {ollama.models.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div className="svc-activity-label">Model Inventory</div>
-                  <ModelGrid models={ollama.models} runningModels={ollama.runningModels} />
-                </div>
-              )}
-
-              <LogTail logs={ollamaLogs} label="ollama.log" />
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="svc-footer-info">

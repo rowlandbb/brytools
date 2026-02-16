@@ -32,12 +32,6 @@ Top-level system telemetry rendered directly (no service block wrapper):
 Below system telemetry, a **Services** section with collapsible panels:
 - **Skinwalker Archive** -- canon entries, source files, request counts, memory usage, recent activity, log tail
 
-Below services, the **Watchdog** panel:
-- Enable/disable toggle (loads/unloads launchd service)
-- iMessage alert phone number configuration
-- Test alert button
-- Incident history (last 5 events)
-
 ### Mac Studio Tab
 
 Top-level system telemetry (same pattern as Mini):
@@ -47,28 +41,12 @@ Top-level system telemetry (same pattern as Mini):
 4. **Machine bar** -- Mac Studio M3 Ultra specs
 5. **Uptime bar** -- system uptime + load averages
 
-Below telemetry, **Ollama** as a collapsible service panel:
-- Service status with start/stop/restart controls via SSH
-- Model tile grid (2-col desktop, 1-col mobile) showing installed models with size/quant/family specs
-- Active model highlighting
-
 ### Shared Components
 
 - `heartbeat.tsx` -- Network EKG + Speed Test, imported by both tabs
 - `Gauge` component -- SVG arc gauge, defined in `page.tsx`
 - `Stat` component -- icon + value + label + subtitle grid cell
 - `LogTail` component -- collapsible log viewer per service
-
-### Watchdog
-
-A bash script (`~/.brytools-watchdog/watchdog.sh`) run by launchd every 60 seconds. Checks:
-- BryTools (port 3002)
-- Skinwalker Archive (port 5001)
-- RowMedia volume mount
-
-Sends iMessage alerts via AppleScript with 5-minute cooldown between repeat alerts. Recovery alerts sent when services come back. Config stored in `~/.brytools-watchdog/config.json`. The watchdog can be enabled/disabled from the Services UI, which loads/unloads the launchd plist.
-
-Note: Ollama was removed from watchdog monitoring since it runs on Mac Studio and shouldn't be checked from the Mini. LucidLink monitoring was removed after the Skinwalker Archive migrated to local data storage.
 
 ---
 
@@ -89,14 +67,13 @@ cd ~/Documents/Vibe/brytools
 brytools start
 ```
 
-`setup.sh` is idempotent and handles everything: Homebrew, Node.js, yt-dlp, ffmpeg, speedtest-cli, npm install, production build, the `brytools` CLI (with auto-detected Tailscale IP), PATH config, watchdog scaffolding, and launchd plist generation. Safe to re-run anytime (skips what's already installed).
+`setup.sh` is idempotent and handles everything: Homebrew, Node.js, yt-dlp, ffmpeg, speedtest-cli, npm install, production build, the `brytools` CLI (with auto-detected Tailscale IP), PATH config, and launchd plist generation. Safe to re-run anytime (skips what's already installed).
 
 **Manual steps after setup:**
 1. Install and log into [Tailscale](https://tailscale.com/download/mac), then re-run `./setup.sh` to stamp the IP into the CLI
 2. Mount external volumes (`ME Backup02` for transcription and dump storage)
-3. Set watchdog phone number in the Services UI
-4. Set up SSH key for Mac Studio (`ssh-copy-id bryan@100.100.179.121`) if Scribe tab is needed
-5. Enable passwordless `powermetrics` for the Power gauge on each machine:
+3. Set up SSH key for Mac Studio (`ssh-copy-id bryan@100.100.179.121`) if Scribe tab is needed
+4. Enable passwordless `powermetrics` for the Power gauge on each machine:
    - Mac Mini: `echo "bryanrowland ALL=(ALL) NOPASSWD: /usr/bin/powermetrics" | sudo tee /etc/sudoers.d/powermetrics`
    - Mac Studio: `echo "bryan ALL=(ALL) NOPASSWD: /usr/bin/powermetrics" | sudo tee /etc/sudoers.d/powermetrics`
 
@@ -158,9 +135,6 @@ brytools/
 │   │   ├── heartbeat/route.ts      # GET: network throughput samples
 │   │   ├── speedtest/route.ts      # POST: runs speedtest-cli
 │   │   ├── speedtest/progress/     # GET: speed test progress
-│   │   ├── watchdog/route.ts       # GET/POST: watchdog config + enable/disable toggle
-│   │   ├── watchdog/test/route.ts  # POST: send test iMessage alert
-│   │   └── incidents/route.ts      # GET: recent watchdog incidents
 │   ├── api/transcribe/             # Transcription endpoints
 │   ├── api/dump/                   # Download endpoints
 │   └── api/files/                  # File browser endpoints
@@ -187,16 +161,8 @@ brytools/
 | Machine | Tailscale IP | Role |
 |---------|-------------|------|
 | Mac Mini M2 Pro (32GB) | 100.80.21.63 | BryTools server (port 3002), always-on |
-| Mac Studio M3 Ultra (256GB) | 100.100.179.121 | AI inference (Ollama), Whisper transcription |
+| Mac Studio M3 Ultra (256GB) | 100.100.179.121 | Whisper transcription |
 | MacBook Pro M3 Max (64GB) | 100.71.16.41 | Bryan's laptop |
-
-### Ollama (Mac Studio)
-
-- **SSH**: `ssh bryan@100.100.179.121` (passwordless, BatchMode)
-- **Health**: `curl http://100.100.179.121:11434/`
-- **API**: `/api/tags` (models), `/api/ps` (running)
-- **Manage**: `brew services restart ollama` via SSH
-- **Logs**: `tail -20 /opt/homebrew/var/log/ollama.log` via SSH
 
 ---
 
@@ -210,7 +176,6 @@ brytools/
 | Transcribe progress | `/Volumes/ME Backup02/BryTranscribe/progress/` |
 | Dump downloads | `/Volumes/ME Backup02/_Dump/` |
 | Dump history DB | `/Volumes/ME Backup02/_Dump/brytools.db` |
-| Watchdog config | `~/.brytools-watchdog/` |
 | Speed test script | `scripts/speedtest.py` |
 
 ---
@@ -232,7 +197,6 @@ brytools/
 ### Service Brand Colors
 - **BryTools / Mac Mini**: Gold (`var(--accent)`, `rgba(196, 160, 105, ...)`)
 - **Skinwalker Archive**: Green (`var(--green)`, `rgba(107, 143, 114, ...)`)
-- **Ollama / Mac Studio**: Purple (`var(--purple)`, `rgba(167, 139, 250, ...)`)
 
 ### Mobile Responsive
 All components adapt at the 640px breakpoint:
@@ -240,7 +204,6 @@ All components adapt at the 640px breakpoint:
 - Stat grids: 3-col to 2-col
 - Service headers: stack vertically
 - Volumes: full-width stacking
-- Model grid: 2-col to 1-col
 - Navigation: top tabs to bottom bar
 - GPU graph: reduced height
 - Uptime bar: wrapping + smaller text
