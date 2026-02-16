@@ -4,9 +4,12 @@ import path from 'path'
 const DB_PATH = '/Volumes/ME Backup02/_Dump/brytools.db'
 
 let _db: Database.Database | null = null
+let _dbFailed = false
 
-export function getDb(): Database.Database {
-  if (!_db) {
+export function getDb(): Database.Database | null {
+  if (_db) return _db
+  if (_dbFailed) return null
+  try {
     _db = new Database(DB_PATH)
     _db.pragma('journal_mode = WAL')
     _db.pragma('busy_timeout = 5000')
@@ -32,8 +35,14 @@ export function getDb(): Database.Database {
         completed_at TEXT
       )
     `)
+    return _db
+  } catch (err) {
+    console.error('[db] Failed to open database — volume may be unavailable:', (err as Error).message)
+    _dbFailed = true
+    // Retry after 60s in case volume comes back
+    setTimeout(() => { _dbFailed = false }, 60000)
+    return null
   }
-  return _db
 }
 
 export interface DownloadRow {
@@ -59,6 +68,7 @@ export interface DownloadRow {
 
 export function insertDownload(row: Partial<DownloadRow> & { id: string; url: string; mode: string }): void {
   const db = getDb()
+  if (!db) return
   db.prepare(`
     INSERT INTO downloads (id, url, title, channel, duration, mode, status, thumbnail_url)
     VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)
@@ -67,6 +77,7 @@ export function insertDownload(row: Partial<DownloadRow> & { id: string; url: st
 
 export function updateDownload(id: string, fields: Partial<DownloadRow>): void {
   const db = getDb()
+  if (!db) return
   const keys = Object.keys(fields).filter(k => k !== 'id')
   if (keys.length === 0) return
   const sets = keys.map(k => `${k} = ?`).join(', ')
@@ -75,41 +86,55 @@ export function updateDownload(id: string, fields: Partial<DownloadRow>): void {
 }
 
 export function getDownload(id: string): DownloadRow | undefined {
-  return getDb().prepare('SELECT * FROM downloads WHERE id = ?').get(id) as DownloadRow | undefined
+  const db = getDb()
+  if (!db) return undefined
+  return db.prepare('SELECT * FROM downloads WHERE id = ?').get(id) as DownloadRow | undefined
 }
 
 export function getQueue(): DownloadRow[] {
-  return getDb().prepare(
+  const db = getDb()
+  if (!db) return []
+  return db.prepare(
     `SELECT * FROM downloads WHERE status IN ('queued', 'downloading', 'processing') ORDER BY created_at ASC`
   ).all() as DownloadRow[]
 }
 
 export function getHistory(limit = 50, offset = 0): DownloadRow[] {
-  return getDb().prepare(
+  const db = getDb()
+  if (!db) return []
+  return db.prepare(
     `SELECT * FROM downloads WHERE status IN ('completed', 'error', 'cancelled') ORDER BY completed_at DESC, created_at DESC LIMIT ? OFFSET ?`
   ).all(limit, offset) as DownloadRow[]
 }
 
 export function getHistoryCount(): number {
-  const row = getDb().prepare(
+  const db = getDb()
+  if (!db) return 0
+  const row = db.prepare(
     `SELECT COUNT(*) as count FROM downloads WHERE status IN ('completed', 'error', 'cancelled')`
   ).get() as { count: number }
   return row.count
 }
 
 export function deleteDownload(id: string): void {
-  getDb().prepare('DELETE FROM downloads WHERE id = ?').run(id)
+  const db = getDb()
+  if (!db) return
+  db.prepare('DELETE FROM downloads WHERE id = ?').run(id)
 }
 
 export function getActiveCount(): number {
-  const row = getDb().prepare(
+  const db = getDb()
+  if (!db) return 0
+  const row = db.prepare(
     `SELECT COUNT(*) as count FROM downloads WHERE status = 'downloading'`
   ).get() as { count: number }
   return row.count
 }
 
 export function getNextQueued(): DownloadRow | undefined {
-  return getDb().prepare(
+  const db = getDb()
+  if (!db) return undefined
+  return db.prepare(
     `SELECT * FROM downloads WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1`
   ).get() as DownloadRow | undefined
 }

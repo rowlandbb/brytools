@@ -16,8 +16,8 @@ const LOG_PATHS: Record<string, { stdout: string; stderr: string }> = {
     stderr: '/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/archive-stderr.log',
   },
   'brytools': {
-    stdout: '/Users/bryanrowland/Documents/Vibe/brytools/brytools.log',
-    stderr: '/Users/bryanrowland/Documents/Vibe/brytools/brytools.log',
+    stdout: '/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/brytools.log',
+    stderr: '/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/brytools.log',
   },
 }
 

@@ -1,5 +1,5 @@
 # BRYTOOLS HANDOFF
-**Last Updated**: February 14, 2026
+**Last Updated**: February 16, 2026
 **Status**: Phase 1 (Transcribe) + Phase 2 (Import/Dump) + Phase 4 (File Browser) + Phase 5 (Services Dashboard) + Phase 6 (Mac Studio Remote Monitoring) + Power Monitoring COMPLETE.
 
 ---
@@ -150,9 +150,12 @@ brytools/
 ├── public/                         # Static assets
 ├── package.json                    # Next.js 16.1.6, React 19, lucide-react, better-sqlite3
 ├── next.config.mjs                 # Must be .mjs for external volume compatibility
-├── start-server.sh                 # Server start script
-└── brytools.log                    # Server log output
+├── start-server.sh                 # Server start script (not used by launchd)
+└── com.bryanrowland.brytools.plist # LaunchAgent definition (canonical copy)
 ```
+
+**Log location**: `/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/brytools.log`
+(Logs are stored outside the project directory -- see LaunchAgent section below for why.)
 
 ---
 
@@ -177,6 +180,38 @@ brytools/
 | Dump downloads | `/Volumes/ME Backup02/_Dump/` |
 | Dump history DB | `/Volumes/ME Backup02/_Dump/brytools.db` |
 | Speed test script | `scripts/speedtest.py` |
+
+---
+
+## LaunchAgent (`com.bryan.brytools-app`)
+
+BryTools runs as a launchd LaunchAgent with `KeepAlive: true` and `RunAtLoad: true`. The plist is at `~/Library/LaunchAgents/com.bryanrowland.brytools.plist`. A canonical copy lives in the project root.
+
+**How it starts**: `node node_modules/next/dist/bin/next start -p 3002` (direct node invocation, not bash). macOS sandbox restrictions block bash scripts launched by LaunchAgent with "Operation not permitted".
+
+**Log path**: `~/Documents/Vibe/swu-scripts/logs/brytools.log` (NOT inside the project directory).
+
+### com.apple.provenance (Critical)
+
+The brytools project directory has the `com.apple.provenance` extended attribute. This is set by macOS when files are created by sandboxed apps (Cursor, VS Code, sandboxed git clients). It cannot be removed -- it's immutable on modern macOS.
+
+When launchd's `xpcproxy` tries to open a file inside a provenance-tagged directory, macOS System Policy blocks it with `deny(1) file-read-data`, causing exit code 78 (EX_CONFIG) and a crash loop. This is why the log path MUST be outside the project directory.
+
+If brytools starts crash-looping with exit code 78 and an empty log, check:
+```bash
+# Is the log path inside a provenance-tagged directory?
+xattr /path/to/log/directory
+# If it shows com.apple.provenance, move the log path elsewhere
+
+# Check system log for the actual denial
+/bin/bash -c 'log show --predicate "composedMessage CONTAINS \"brytools\" AND composedMessage CONTAINS \"deny\"" --last 5m'
+```
+
+The skinwalker project avoids this by writing logs to `swu-scripts/logs/` which was created by a non-sandboxed process and has no provenance.
+
+### Database on External Volume
+
+The SQLite database lives at `/Volumes/ME Backup02/_Dump/brytools.db`. If the volume is unmounted, `lib/db.ts` handles this gracefully -- all database functions return empty results instead of crashing. The database reconnects automatically after 60 seconds.
 
 ---
 

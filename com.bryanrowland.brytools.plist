@@ -6,19 +6,29 @@
     <string>com.bryan.brytools-app</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>/Users/bryanrowland/Documents/Vibe/brytools/start-server.sh</string>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/bryanrowland/Documents/Vibe/brytools/node_modules/.bin/next</string>
+        <string>start</string>
+        <string>-p</string>
+        <string>3002</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/bryanrowland/Documents/Vibe/brytools</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+    </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/bryanrowland/Documents/Vibe/brytools/brytools.log</string>
+    <string>/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/brytools.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/bryanrowland/Documents/Vibe/brytools/brytools.log</string>
+    <string>/Users/bryanrowland/Documents/Vibe/swu-scripts/logs/brytools.log</string>
     <key>ThrottleInterval</key>
     <integer>10</integer>
 </dict>
