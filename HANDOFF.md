@@ -191,9 +191,11 @@ BryTools runs as a launchd LaunchAgent with `KeepAlive: true` and `RunAtLoad: tr
 
 **Log path**: `~/Documents/Vibe/swu-scripts/logs/brytools.log` (NOT inside the project directory).
 
+**Restart handling**: `KeepAlive: true` in the plist means launchd automatically restarts the process if it dies. No external watchdog, keeper script, or cron job is needed. Previous watchdog systems (`com.bryanrowland.brytools-watchdog`, `brytools-keeper.sh`) were removed Feb 16, 2026 because they were redundant with launchd's native restart.
+
 ### com.apple.provenance (Critical)
 
-The brytools project directory has the `com.apple.provenance` extended attribute. This is set by macOS when files are created by sandboxed apps (Cursor, VS Code, sandboxed git clients). It cannot be removed -- it's immutable on modern macOS.
+The brytools project directory has the `com.apple.provenance` extended attribute. This was set by GitHub Desktop (a sandboxed macOS app) when it cloned/pulled the repo. It cannot be removed -- it's immutable on modern macOS. GitHub Desktop has since been uninstalled.
 
 When launchd's `xpcproxy` tries to open a file inside a provenance-tagged directory, macOS System Policy blocks it with `deny(1) file-read-data`, causing exit code 78 (EX_CONFIG) and a crash loop. This is why the log path MUST be outside the project directory.
 
